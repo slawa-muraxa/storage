@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package storage;
+
+service MetaService {
+    rpc UpdateTarget (UpdateTargetRequest) returns (UpdateTargetResponse);
+  }
+  
+  message UpdateTargetRequest {
+    string bucket = 1;
+    string objectName = 2;
+    Target target = 3;
+  }
+  
+  message Target {
+    string globalId = 1;
+    map<string, string> selections = 2;
+  }
+  
+  message UpdateTargetResponse {
+    bool success = 1;
+    string message = 2;
+    SObject updatedObject = 3;
+  }
+  
+  message SObject {
+    string id = 1;
+    map<string, string> metadata = 2;
+  }
+  

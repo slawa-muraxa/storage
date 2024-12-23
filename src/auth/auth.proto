@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package auth;
+
+// The AuthService defines the available RPCs for authentication operations.
+service AuthService {
+    // Verifies a token and returns the decoded token.
+    rpc VerifyToken(TokenRequest) returns (TokenResponse);
+
+    // Checks if the user associated with the token is an admin.
+    rpc IsAdmin(TokenRequest) returns (AdminResponse);
+
+    // Changes the password for the user with the given user ID.
+    rpc ChangePassword(ChangePasswordRequest) returns (Empty);
+
+    // Changes the role for the user with the given user ID.
+    rpc ChangeRole(ChangeRoleRequest) returns (Empty);
+}
+
+// Request message for verifying a token.
+message TokenRequest {
+    string token = 1; // JWT or token to verify
+}
+
+// Response message containing decoded token information.
+message TokenResponse {
+    string username = 1; // Decoded username from token
+    string role = 2;     // Decoded role from token
+    int32 userId = 3;     // Decoded userId from token
+}
+
+// Response message indicating whether the user is an admin.
+message AdminResponse {
+    bool isAdmin = 1; // True if user is an admin, otherwise false
+}
+
+// Request message for changing a user's password.
+message ChangePasswordRequest {
+    string token = 1;        // JWT or token to authorize the action
+    string newPassword = 2;  // The new password to set
+    int32 userId = 3;        // The user ID for whom the password is being changed
+}
+
+// Request message for changing a user's role.
+message ChangeRoleRequest {
+    string token = 1;    // JWT or token to authorize the action
+    string newRole = 2;  // The new role to assign to the user
+    int32 userId = 3;    // The user ID for whom the role is being changed
+}
+
+// Empty message to be used in responses where no data needs to be returned.
+message Empty {}
