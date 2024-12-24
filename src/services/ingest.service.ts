@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { VideoService } from "./video.service";
 import { StorageConnector } from "../connectors/storage.connector";
+import { StorageService } from "../services/storage.service";
 import { KafkaConnector } from "../connectors/kafka.connector";
 import * as path from "path";
 import * as fs from "fs";
@@ -11,6 +12,7 @@ export class IngestService {
 
   constructor(
     private readonly videoService: VideoService,
+    private readonly storageService: StorageService,
     @Inject('StorageConnector') private readonly storage: StorageConnector,
     private readonly kafka: KafkaConnector
   ) {}
@@ -48,6 +50,8 @@ export class IngestService {
       await this.videoService.cleanupDirectory(tmpPreviewImages);
 
       framePublisher.publishFrameMeta();
+
+      this.storageService.updateObjectTargets("l1-raw", objectName, {serviceName: "LAKE", trackingId: dstPath, references: {targetPath: storagePath}});
 
       this.logger.log(`Completed ingestion for task ${dstPath}`);
     } catch (error) {

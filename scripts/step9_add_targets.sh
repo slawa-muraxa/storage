@@ -6,10 +6,10 @@ GRPC_HOST="localhost:53004"                              # gRPC host and port
 PROTO_FILE_PATH="/tmp/muraxa/storage/storage.proto"        # Destination path for proto file
 BUCKET="l1-raw"
 OBJECT="test/bmp_13m.mp4"
-GLOBAL_ID="1234567890"
-SELECTIONS_JSON='{"cvatTaskId":"1"}'
-GLOBAL_ID_2="1234567891"
-SELECTIONS_JSON_2='{"cvatTaskId":"2"}'
+TRACKING_ID="1234567890"
+REFERENCES_JSON='{"cvatTaskId":"1"}'
+TRACKING_ID_2="1234567891"
+REFERENCES_JSON_2='{"cvatTaskId":"2"}'
 
 # Expected Output for Comparison
 EXPECTED_JSON='{
@@ -22,8 +22,9 @@ EXPECTED_JSON='{
   "metadata": {
     "targets": [
       {
-        "globalId": "1234567890",
-        "selections": { "cvatTaskId": "1" }
+        "serviceName": "CVAT",
+        "trackingId": "1234567890",
+        "references": { "cvatTaskId": "1" }
       }
     ]
   }
@@ -39,12 +40,14 @@ EXPECTED_JSON_2='{
   "metadata": {
     "targets": [
       {
-        "globalId": "1234567890",
-        "selections": { "cvatTaskId": "1" }
+        "serviceName": "CVAT",
+        "trackingId": "1234567890",
+        "references": { "cvatTaskId": "1" }
       },
       {
-        "globalId": "1234567891",
-        "selections": { "cvatTaskId": "2" }
+        "serviceName": "CVAT",
+        "trackingId": "1234567891",
+        "references": { "cvatTaskId": "2" }
       }
     ]
   }
@@ -94,8 +97,9 @@ HTTP_RESPONSE=$(curl -s -X POST "$HTTP_HOST" \
     "bucket": "'"$BUCKET"'",
     "objectName": "'"$OBJECT"'",
     "target": {
-      "globalId": "'"$GLOBAL_ID"'",
-      "selections": '"$SELECTIONS_JSON"'
+      "serviceName": "CVAT",
+      "trackingId": "'"$TRACKING_ID"'",
+      "references": '"$REFERENCES_JSON"'
     }
   }')
 
@@ -121,8 +125,9 @@ GRPC_RESPONSE=$(grpcurl -plaintext -import-path /tmp/muraxa/storage -proto "$PRO
     "bucket": "'"$BUCKET"'",
     "objectName": "'"$OBJECT"'",
     "target": {
-      "globalId": "'"$GLOBAL_ID_2"'",
-      "selections": '"$SELECTIONS_JSON_2"'
+      "serviceName": "CVAT",
+      "trackingId": "'"$TRACKING_ID_2"'",
+      "references": '"$REFERENCES_JSON_2"'
     }
   }' "$GRPC_HOST" storage.MetaService/UpdateTarget)
 

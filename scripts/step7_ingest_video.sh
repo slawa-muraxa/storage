@@ -14,6 +14,38 @@ INTERVAL=2
 TOPIC="frame-update"
 BROKER="localhost:9092" # Adjust broker address if needed
 
+# Expected Output for Comparison
+EXPECTED_JSON='{
+  "id": "test/bmp_13m.mp4",
+  "active": true,
+  "bucket": "l1-raw",
+  "etag": "c851844bfe74d9da418cc21bf2b0edd4",
+  "name": "test/bmp_13m.mp4",
+  "size": 2099183,
+  "metadata": {
+    "targets": [
+      {
+        "serviceName": "LAKE",
+        "trackingId": "bmp_13m.mp4",
+        "references": {
+          "targetPath": "alpha-project/bmp_13m.mp4/images/default"
+        }
+      }
+    ]
+  }
+}'
+
+# Delete metadata.targets field from the MongoDB record
+echo "Deleting metadata.targets from MongoDB record..."
+mongosh --quiet --host localhost:37017 --eval '
+  db = connect("mongodb://localhost:37017/storage");
+  db.getCollection("storage.l1-raw.objects").updateOne(
+    { id: "test/bmp_13m.mp4" },
+    { $unset: { "metadata.targets": [] } }
+  );
+  print("metadata.targets field deleted from object test/bmp_13m.mp4");
+'
+
 # Test Endpoint
 echo "Testing /ingest-video endpoint..."
 RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$API_URL" \
@@ -49,6 +81,27 @@ mc ls "$MINIO_ALIAS/$TARGET_BUCKET/$PROJECT_NAME/$DST_PATH/"
 if [ -f "$DOWNLOAD_PATH" ]; then
   echo "Cleaning up downloaded file..."
   rm -f "$DOWNLOAD_PATH"
+fi
+
+# Fetch MongoDB record and ensure it's output as valid JSON
+MONGODB_RECORD=$(mongosh --quiet --host localhost:37017 --eval '
+  db = connect("mongodb://localhost:37017/storage");
+  JSON.stringify(db.getCollection("storage.l1-raw.objects").findOne({ id: "test/bmp_13m.mp4" }))
+')
+
+# Filter MongoDB record to exclude _id, __v, lastModified using jq
+FILTERED_MONGODB_RECORD=$(echo "$MONGODB_RECORD" | jq 'del(._id, .__v, .lastModified)')
+
+echo "Filtered MongoDB Record:"
+echo "$FILTERED_MONGODB_RECORD"
+echo ""
+
+# Compare MongoDB record with expected JSON
+if echo "$FILTERED_MONGODB_RECORD" | jq --argjson expected "$EXPECTED_JSON" -e 'if . == $expected then true else false end' > /dev/null; then
+  echo "MongoDB record matches expected output!"
+else
+  echo "MongoDB record does NOT match expected output!"
+  exit 1
 fi
 
 # Wait and validate Kafka message

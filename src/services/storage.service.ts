@@ -98,7 +98,7 @@ export class StorageService {
   async updateObjectTargets(
     bucket: string,
     objectName: string,
-    target: { globalId: string; selections: any }
+    target: { serviceName: string; trackingId: string; references: any }
   ): Promise<any> {
     try {
       // Get the model for the specified bucket
@@ -110,13 +110,13 @@ export class StorageService {
       if (updatedObject) {
         // Check if the globalId already exists in the metadata.targets array
         const existingTarget = updatedObject.metadata?.targets?.find(
-          (t: { globalId: string }) => t.globalId === target.globalId
+          (t: { globalId: string }) => t.globalId === target.trackingId
         );
 
         // If the globalId is the same, do not push a new target
         if (existingTarget) {
           this.logger.warn(
-            `Target with globalId "${target.globalId}" already exists for object "${objectName}".`
+            `Target with globalId "${target.trackingId}" already exists for object "${objectName}".`
           );
           return updatedObject; // Return the existing object without any changes
         }

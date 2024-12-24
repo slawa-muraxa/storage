@@ -6,6 +6,7 @@ import { MongooseModuleOptions } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
 import { Client as MinioClient } from 'minio';
 import { S3Client } from '@aws-sdk/client-s3';
+import https from "https";
 
 // GrpcOptions Factory
 export const grpcOptionsFactory = async (configService: ConfigService): Promise<GrpcOptions> => {
@@ -105,7 +106,7 @@ export const s3ClientFactory = async (configService: ConfigService): Promise<S3C
 
       // Create an S3Client instance 
       const s3Client = new S3Client({
-          region: 'us-west-1', // Example region, can be configured based on your needs
+          region: 'us-east-1',
           endpoint: `http${useSSL ? 's' : ''}://${endPoint}:${port}`,
           credentials: {
               accessKeyId: accessKey,

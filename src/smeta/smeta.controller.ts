@@ -48,7 +48,7 @@ export class MetaController {
     @Post('update-target')
     @UseGuards(AuthGuard)
     async updateTarget(
-        @Body() body: { bucket: string; objectName: string; target: { globalId: string; selections: any } },
+        @Body() body: { bucket: string; objectName: string; target: { serviceName: string; trackingId: string; references: any } },
         @Res() res
     ) {
         const { bucket, objectName, target } = body;
@@ -93,7 +93,7 @@ export class MetaController {
      * gRPC method to update object targets
      */
     @GrpcMethod('MetaService', 'UpdateTarget')
-    async updateTargetGrpc(data: { bucket: string; objectName: string; target: { globalId: string; selections: any } }) {
+    async updateTargetGrpc(data: { bucket: string; objectName: string; target: { serviceName: string; trackingId: string; references: any } }) {
         const { bucket, objectName, target } = data;
 
         try {

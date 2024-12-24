@@ -17,19 +17,19 @@ services:
     networks:
       - shared_network
 
-  ceph:
-    image: ceph/daemon:latest-mimic
-    container_name: ceph
-    environment:
-      MON_IP: 127.0.0.1
-      CEPH_PUBLIC_NETWORK: 0.0.0.0/0
-      CEPH_DAEMON: DEMO
-    ports:
-      - "6789:6789"  # Ceph Monitor port
-      - "7480:7480"  # RADOS Gateway (S3-compatible API)
-    privileged: true
-    networks:
-      - shared_network
+  # ceph:
+  #   image: ceph/daemon:latest-mimic
+  #   container_name: ceph
+  #   environment:
+  #     MON_IP: 127.0.0.1
+  #     CEPH_PUBLIC_NETWORK: 0.0.0.0/0
+  #     CEPH_DAEMON: DEMO
+  #   ports:
+  #     - "6789:6789"  # Ceph Monitor port
+  #     - "7480:7480"  # RADOS Gateway (S3-compatible API)
+  #   privileged: true
+  #   networks:
+  #     - shared_network
 
   mongodb:
     image: mongo:8.0-rc
