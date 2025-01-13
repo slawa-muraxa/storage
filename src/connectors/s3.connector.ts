@@ -21,7 +21,7 @@ export class S3Connector implements StorageConnector {
 
     constructor(
         @Inject('S3_CLIENT') private readonly s3Client: S3Client,
-    ) {}
+    ) { }
 
     async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Readable> {
         try {
@@ -50,7 +50,7 @@ export class S3Connector implements StorageConnector {
         try {
             // Read the file from the provided full path
             const fileContent = await fs.readFile(fullPath);
-    
+
             // Create the PutObjectCommand
             const command = new PutObjectCommand({
                 Bucket: bucketName,
@@ -58,10 +58,10 @@ export class S3Connector implements StorageConnector {
                 Body: fileContent,
                 Metadata: metadata,
             });
-    
+
             // Send the command to S3
             const response = await this.s3Client.send(command);
-    
+
             // Log success and return the ETag as confirmation
             this.logger.log(`Successfully uploaded object to ${bucketName}/${targetFilePath}`);
             return response.ETag || '';
@@ -78,7 +78,7 @@ export class S3Connector implements StorageConnector {
     async acquireLock(): Promise<boolean> {
         const lockObject = `locks/${this.lockKey}`;
         const bucketName = 'l1-raw'; // Or configure a dedicated lock bucket.
-    
+
         try {
             const command = new PutObjectCommand({
                 Bucket: bucketName,
@@ -89,7 +89,7 @@ export class S3Connector implements StorageConnector {
                 // This ensures the object is only uploaded if it does not already exist
                 IfNoneMatch: '*',
             });
-    
+
             await this.s3Client.send(command);
             return true;
         } catch (err) {
@@ -97,22 +97,22 @@ export class S3Connector implements StorageConnector {
                 this.logger.warn(`Lock already exists: ${lockObject}`);
                 return false; // Lock already held
             }
-    
+
             this.logger.error(`Error acquiring lock: ${lockObject}`, err);
             throw err; // Other unexpected errors
         }
     }
-    
+
     async releaseLock(): Promise<void> {
         const lockObject = `locks/${this.lockKey}`;
         const bucketName = 'l1-raw'; // Or configure a dedicated lock bucket.
-    
+
         try {
             const command = new DeleteObjectCommand({
                 Bucket: bucketName,
                 Key: lockObject,
             });
-    
+
             await this.s3Client.send(command);
         } catch (err) {
             this.logger.error(`Error releasing lock: ${lockObject}`, err);
@@ -124,20 +124,20 @@ export class S3Connector implements StorageConnector {
         try {
             const command = new GetObjectCommand({ Bucket: bucketName, Key: objectName });
             const response = await this.s3Client.send(command);
-    
+
             const fileStream = response.Body as Readable;
-    
+
             // Ensure the directory exists before attempting to write the file
             await fs.mkdir(path.dirname(filePath), { recursive: true });
-    
+
             const writeStream = createWriteStream(filePath);
-    
+
             await new Promise<void>((resolve, reject) => {
                 fileStream.pipe(writeStream)
                     .on('finish', resolve)
                     .on('error', reject);
             });
-    
+
             this.logger.log(`Successfully downloaded ${objectName} from S3 bucket ${bucketName} to ${filePath}`);
             return filePath;
         } catch (err) {
@@ -149,11 +149,18 @@ export class S3Connector implements StorageConnector {
     async uploadFile(bucketName: string, objectName: string, filePath: string, metadata: Record<string, any> = {}): Promise<string> {
         try {
             const fileContent = await fs.readFile(filePath);
+
+            // Ensure all metadata values are strings
+            const sanitizedMetadata: Record<string, string> = {};
+            Object.entries(metadata).forEach(([key, value]) => {
+                sanitizedMetadata[key] = value?.toString() ?? ''; // Convert to string or use empty string as fallback
+            });
+
             const command = new PutObjectCommand({
                 Bucket: bucketName,
                 Key: objectName,
                 Body: fileContent,
-                Metadata: metadata,
+                Metadata: sanitizedMetadata,
             });
             const response = await this.s3Client.send(command);
 
@@ -181,13 +188,13 @@ export class S3Connector implements StorageConnector {
         }
     }
 
-    async getObjectStats(bucketName: string, objectName: string): Promise<{size: number}> {
+    async getObjectStats(bucketName: string, objectName: string): Promise<{ size: number }> {
         try {
             const command = new HeadObjectCommand({ Bucket: bucketName, Key: objectName });
             const response = await this.s3Client.send(command);
 
             this.logger.log(`Successfully fetched stats for ${objectName} from bucket ${bucketName}`);
-            return {size: response.ContentLength};
+            return { size: response.ContentLength };
         } catch (err) {
             this.logger.error(`Error fetching stats for ${objectName} from S3 bucket ${bucketName}:`, err);
             throw err;
@@ -211,7 +218,7 @@ export class S3Connector implements StorageConnector {
         try {
             const objects: any = [];
             let continuationToken: string | undefined = undefined;
-    
+
             do {
                 const command = new ListObjectsV2Command({
                     Bucket: bucketName,
@@ -219,7 +226,7 @@ export class S3Connector implements StorageConnector {
                     ContinuationToken: continuationToken,
                 });
                 const response = await this.s3Client.send(command);
-    
+
                 // Map each object to SObject schema-compatible structure
                 const mappedObjects = (response.Contents || []).map((obj) => {
                     return {
@@ -229,14 +236,14 @@ export class S3Connector implements StorageConnector {
                         size: obj.Size,
                         lastModified: obj.LastModified,
                         active: true,
-                        metadata: {}, 
+                        metadata: {},
                     };
                 });
-    
+
                 objects.push(...mappedObjects);
                 continuationToken = response.NextContinuationToken;
             } while (continuationToken);
-    
+
             this.logger.log(`Successfully fetched all objects from bucket ${bucketName}`);
             return objects;
         } catch (err) {

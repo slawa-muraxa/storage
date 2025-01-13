@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Body, Query, Req, Res, UseGuards, UploadedFiles, HttpStatus, UseInterceptors, Logger, Headers, Inject } from '@nestjs/common';
 import { StorageConnector } from './connectors/storage.connector';
-import { VideoService } from './services/video.service';  
-import { IngestService } from './services/ingest.service';  
+import { VideoService } from './services/video.service';
+import { IngestService } from './services/ingest.service';
 import { StorageService } from './services/storage.service';  // Mongo service to interact with your database
 import { AuthGuard } from './auth/auth.guard.rpc';  // Auth guard for route protection
 import * as fs from 'fs';
@@ -29,7 +29,7 @@ export class StorageController {
             console.log('Start syncing MinIO buckets');
             const buckets = ["l1-raw", "l2-prep", "l3-rel"];
             const newBucketData = await Promise.all(buckets.map(async (bucket) => {
-                const objects = await this.storage.listAllObjects(bucket,'');
+                const objects = await this.storage.listAllObjects(bucket, '');
                 this.logger.debug(`fetched ${objects.length} objects from ${bucket} for syncing`);
                 return { bucket, objects };
             }));
@@ -145,31 +145,56 @@ export class StorageController {
         })
     }))
     @UseGuards(AuthGuard)
-    async uploadFile(@UploadedFiles() files: Express.Multer.File[], @Body() body: { customer: string, date: string }, @Res() res) {
-        const { customer, date } = body;
+    async uploadFile(
+        @UploadedFiles() files: Express.Multer.File[],
+        @Body() body: { customer: string; date: string; metadata: string },
+        @Res() res
+    ) {
+        const { customer, date, metadata } = body;
 
         if (!files || files.length === 0) {
             this.logger.error('No files provided');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No files provided' });
         }
 
+        // Parse metadata from JSON string
+        let parsedMetadata: Record<string, any>[] = [];
+        try {
+            parsedMetadata = JSON.parse(metadata);
+        } catch (error) {
+            this.logger.error('Invalid metadata format');
+            return res.status(HttpStatus.BAD_REQUEST).json({ message: 'Invalid metadata format', error: error.message });
+        }
+
         this.logger.debug('Upload File Request Received');
         this.logger.debug(`Customer: ${customer}, Date: ${date}`);
         this.logger.debug(`Files: ${JSON.stringify(files)}`);
+        this.logger.debug(`Metadata: ${JSON.stringify(parsedMetadata)}`);
         this.logger.debug(`Number of files to upload: ${files.length}`);
+
+        if (parsedMetadata.length !== files.length) {
+            this.logger.error('Metadata count does not match files count');
+            return res.status(HttpStatus.BAD_REQUEST).json({
+                message: 'Metadata count does not match files count',
+            });
+        }
 
         try {
             const startTime = Date.now();
             this.logger.debug(`Start time: ${startTime}`);
 
-            for (const file of files) {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const meta = parsedMetadata[i];
+
                 this.logger.debug(`Processing file: ${file.originalname}`);
+                this.logger.debug(`Metadata for file: ${JSON.stringify(meta)}`);
 
                 const objectName = `${customer}_${format(new Date(date), 'yyMMdd')}/${file.originalname}`;
                 this.logger.debug(`Generated object name: ${objectName}`);
 
-                // Upload the file to MinIO
-                await this.storage.uploadFile('l1-raw', objectName, file.path);
+                // Upload the file to MinIO with metadata
+                await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
                 this.logger.debug(`File uploaded: ${objectName}`);
 
                 // Remove the file after upload
@@ -182,13 +207,17 @@ export class StorageController {
             this.logger.debug(`End time: ${endTime}`);
             this.logger.debug(`Upload completed in ${duration} seconds`);
 
-            return res.status(HttpStatus.OK).json({ message: `Files uploaded successfully in ${duration} seconds` });
+            return res.status(HttpStatus.OK).json({
+                message: `Files uploaded successfully in ${duration} seconds`,
+            });
         } catch (error) {
             this.logger.error('Error during file upload:', error);
-            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: 'Error uploading files', error: error.message });
+            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+                message: 'Error uploading files',
+                error: error.message,
+            });
         }
     }
-
 
     @Post('cut-selection')
     @UseGuards(AuthGuard)
@@ -310,13 +339,13 @@ export class StorageController {
 
 
     private groupByBucket(data) {
-    return data.reduce((acc, obj) => {
-        const { bucket, ...rest } = obj.toObject();
-        if (!acc[bucket]) {
-            acc[bucket] = [];
-        }
-        acc[bucket].push(rest);
-        return acc;
-    }, {});
-}
+        return data.reduce((acc, obj) => {
+            const { bucket, ...rest } = obj.toObject();
+            if (!acc[bucket]) {
+                acc[bucket] = [];
+            }
+            acc[bucket].push(rest);
+            return acc;
+        }, {});
+    }
 }
