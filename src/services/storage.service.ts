@@ -32,8 +32,8 @@ export class StorageService {
         objects.map(async (object) => {
           await sObjectModel.updateOne(
             { id: object.name }, // Use a unique identifier for the object
-            { ...object, bucket }, // Include bucket info for tracking
-            { upsert: true } // Create the object if it doesn't exist
+            { $set: { ...object, bucket } }, // Include bucket info for tracking
+            { new: true, upsert: true } // Create the object if it doesn't exist
           );
         })
       );
@@ -78,8 +78,11 @@ export class StorageService {
       // Find the object by name and update its metadata
       const result = await sObjectModel.findOneAndUpdate(
         { name: objectName }, // Query by object name
-        { $set: { 'metadata.video': metadata } }, // Update the metadata field
-        { new: true, upsert: false } // Return the updated document, do not create if it doesn't exist
+        [
+          //{ $set: { metadata: {$ifNull: ['$metadata', {}]}}},
+          { $set: { 'metadata.video': metadata } }
+        ], // Update the metadata field
+        { new: true } // Return the updated document, do not create if it doesn't exist
       );
 
       // If the object does not exist, log a warning and return null
@@ -160,34 +163,31 @@ export class StorageService {
     try {
       const sObjectModel = this.getModelForBucket(bucket);
   
-      // Find the object by name
-      const existingObject = await sObjectModel.findOne({ name: objectName });
+      const updatedObject = await sObjectModel.findOneAndUpdate(
+        { name: objectName },
+        { $set: { 'metadata.tags': tags } },
+        { new: true }
+      );
   
-      if (!existingObject) {
-        this.logger.warn(`Object with name "${objectName}" not found in bucket "${bucket}".`);
-        return null;
-      }
-  
-      const existingTags = existingObject?.metadata?.tags || [];
-  
-      // Merge tags based on unique `name`
-      const tagMap = new Map<string, { name: string; time?: string; color?: string }>();
-  
-      // Add existing tags to the map
-      for (const tag of existingTags) {
-        tagMap.set(tag.name, tag);
-      }
-  
-      // Update or add new tags
-      for (const tag of tags) {
-        tagMap.set(tag.name, { ...tagMap.get(tag.name), ...tag });
-      }
-  
-      const updatedTags = Array.from(tagMap.values());
+      return updatedObject;
+    } catch (err) {
+      this.logger.error(`Error adding tags to object "${objectName}" in bucket "${bucket}".`, err);
+      throw err;
+    }
+  }  
+
+  // New tagObject method
+  async updateAttributes(
+    bucket: string,
+    objectName: string,
+    attributes: string []
+  ): Promise<any> {
+    try {
+      const sObjectModel = this.getModelForBucket(bucket);
   
       const updatedObject = await sObjectModel.findOneAndUpdate(
         { name: objectName },
-        { $set: { 'metadata.tags': updatedTags } },
+        { $set: { 'metadata.attributes': attributes } },
         { new: true }
       );
   

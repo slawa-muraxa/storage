@@ -4,7 +4,7 @@ import { KafkaConnector } from '../connectors/kafka.connector';
 import * as unzipper from 'unzipper';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron, CronExpression, Timeout } from '@nestjs/schedule';
 
 @Injectable()
 export class ZipFileProcessorService {
@@ -94,12 +94,8 @@ export class ZipFileProcessorService {
         return files;
     }
 
-    @Cron(CronExpression.EVERY_10_SECONDS)
+    @Timeout(10000)
     async checkNewZipFiles(): Promise<void> {
-        // Ensure the lock is acquired before processing
-        const lockAcquired = await this.storage.acquireLock();
-        if (!lockAcquired) return;
-
         try {
             const objects = await this.storage.listAllObjects('l2-prep', 'annotations/');
             for (const obj of objects) {

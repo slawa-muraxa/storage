@@ -102,6 +102,6 @@ export class KafkaConnector implements OnModuleInit, OnModuleDestroy {
 
   // Specific function to publish account data (uses publishMessage under the hood)
   async publishFrameUpdate(frameData: any): Promise<void> {
-    await this.publishMessage("frame-update", frameData); 
+    await this.publishMessage("frame-update", frameData);
   }
 }

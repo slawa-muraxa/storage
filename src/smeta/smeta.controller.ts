@@ -89,6 +89,29 @@ export class MetaController {
         }
     }
 
+    // HTTP endpoint to tag an object
+    @Post('update-attributes')
+    @UseGuards(AuthGuard)
+    async updateAttributes(
+        @Body() body: { objectName: string; attributes: string[]; bucket: string },
+        @Res() res: Response
+    ) {
+        const { objectName, attributes, bucket } = body;
+
+        try {
+            const updatedObject = await this.db.updateAttributes(bucket, objectName, attributes);
+
+            if (!updatedObject) {
+                return res.status(HttpStatus.NOT_FOUND).json({ error: 'Object not found' });
+            }
+
+            return res.status(HttpStatus.OK).json(updatedObject);
+        } catch (error) {
+            this.logger.error('Error tagging object', error);
+            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Error adding tags' });
+        }
+    }
+
     /**
      * gRPC method to update object targets
      */

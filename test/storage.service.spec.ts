@@ -62,8 +62,8 @@ describe('StorageService', () => {
     );
     expect(mockModel.updateOne).toHaveBeenCalledWith(
       { id: 'file1.txt' },
-      { name: 'file1.txt', active: true, bucket: 'l1-raw' },
-      { upsert: true },
+      { $set: {name: 'file1.txt', active: true, bucket: 'l1-raw'} },
+      { new: true, upsert: true },
     );
   });
 

@@ -1,20 +1,15 @@
 #!/bin/bash
 
 # Variables
-HTTP_HOST="http://localhost:3004/api/meta/tag-object"  # HTTP host and endpoint
-GRPC_HOST="localhost:53004"                              # gRPC host and port
-PROTO_FILE_PATH="/tmp/muraxa/storage/storage.proto"        # Destination path for proto file
+HTTP_HOST="http://localhost:3004/api/meta/update-attributes"  # HTTP host and endpoint
 BUCKET="l1-raw"
 OBJECT="test/bmp_13o.mp4"
-GLOBAL_ID="1234567890"
-TAGS_JSON='[{"name":"tank", "color":"#F865A4", "time": "3.21"}, {"name":"tank", "color":"#F865A4", "time": "4.21"}]'
-TAGS_JSON_2='[{"name":"tank", "color":"#F865A4", "time": "3.21"}]'
-TAGS_JSON_3='[{"name":"ifv", "color":"#F865B4", "time": "4.21"}]'
+ATTRIB_JSON='[{"name":"weather", "value": "sunny"}, {"name":"brigade", "value":80}]'
+ATTRIB_JSON_2='[{"name":"weather", "value": "cloudy"}, {"name":"brigade", "value":80}, {"name":"quality", "value":"clean"}]'
 
 # Expected Output for Comparison
-EXPECTED_JSON='[ { "name": "tank", "color": "#F865A4", "time": "3.21" }, { "name": "tank", "color": "#F865A4", "time": "4.21" } ]'
-
-EXPECTED_JSON_2='[{"name":"ifv", "color":"#F865B4", "time": "4.21"}]'
+EXPECTED_JSON='[{"name":"weather", "value": "sunny"}, {"name":"brigade", "value":80}]'
+EXPECTED_JSON_2='[{"name":"weather", "value": "cloudy"}, {"name":"brigade", "value":80}, {"name":"quality", "value":"clean"}]'
 
 # Delete metadata.targets field from the MongoDB record
 echo "Deleting metadata.targets from MongoDB record..."
@@ -22,9 +17,9 @@ mongosh --quiet --host localhost:37017 --eval '
   db = connect("mongodb://localhost:37017/storage");
   db.getCollection("storage.l1-raw.objects").updateOne(
     { id: "test/bmp_13o.mp4" },
-    { $unset: { "metadata.tags": [] } }
+    { $unset: { "metadata.attributes": [] } }
   );
-  print("metadata.tags field deleted from object test/bmp_13o.mp4");
+  print("metadata.attributes field deleted from object test/bmp_13o.mp4");
 '
 
 # HTTP Test #1 - No metadata, new tags, duplicated entries
@@ -34,7 +29,7 @@ HTTP_RESPONSE=$(curl -s -X POST "$HTTP_HOST" \
   -d '{
     "bucket": "'"$BUCKET"'",
     "objectName": "'"$OBJECT"'",
-    "tags": '"$TAGS_JSON"'
+    "attributes": '"$ATTRIB_JSON"'
   }')
 
 # HTTP Test #2 - Duplicated tags
@@ -44,7 +39,7 @@ HTTP_RESPONSE=$(curl -s -X POST "$HTTP_HOST" \
   -d '{
     "bucket": "'"$BUCKET"'",
     "objectName": "'"$OBJECT"'",
-    "tags": '"$TAGS_JSON"'
+    "attributes": '"$ATTRIB_JSON"'
   }')  
 
 # Filter HTTP response to exclude _id, __v, lastModified
@@ -55,7 +50,7 @@ echo "Filtered HTTP Response:"
 echo -e "Response:\n$(echo "$FILTERED_HTTP_RESPONSE" | jq --color-output '.')"
 echo ""
 
-metadata=$(echo "$FILTERED_HTTP_RESPONSE" | jq '.metadata.tags')
+metadata=$(echo "$FILTERED_HTTP_RESPONSE" | jq '.metadata.attributes')
 
 if echo "$metadata" | jq --argjson expected "$EXPECTED_JSON" -e 'if . == $expected then true else false end' > /dev/null; then
   echo "HTTP response matches expected output!"
@@ -71,18 +66,8 @@ HTTP_RESPONSE=$(curl -s -X POST "$HTTP_HOST" \
   -d '{
     "bucket": "'"$BUCKET"'",
     "objectName": "'"$OBJECT"'",
-    "tags": '"$TAGS_JSON_2"'
+    "attributes": '"$ATTRIB_JSON_2"'
   }')  
-
-# HTTP Test #4 - Add new tags
-echo "Test #4 - Add new tags"
-HTTP_RESPONSE=$(curl -s -X POST "$HTTP_HOST" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "bucket": "'"$BUCKET"'",
-    "objectName": "'"$OBJECT"'",
-    "tags": '"$TAGS_JSON_3"'
-  }')    
 
 # Filter HTTP response to exclude _id, __v, lastModified
 FILTERED_HTTP_RESPONSE=$(echo "$HTTP_RESPONSE" | jq 'del(._id, .__v, .lastModified)')
@@ -92,7 +77,7 @@ echo "Filtered HTTP Response:"
 echo -e "Response:\n$(echo "$FILTERED_HTTP_RESPONSE" | jq --color-output '.')"
 echo ""
 
-metadata=$(echo "$FILTERED_HTTP_RESPONSE" | jq '.metadata.tags')
+metadata=$(echo "$FILTERED_HTTP_RESPONSE" | jq '.metadata.attributes')
 
 if echo "$metadata" | jq --argjson expected "$EXPECTED_JSON_2" -e 'if . == $expected then true else false end' > /dev/null; then
   echo "HTTP response matches expected output!"
@@ -117,7 +102,7 @@ echo "Filtered MongoDB Record:"
 echo -e "Response:\n$(echo "$FILTERED_MONGODB_RECORD" | jq --color-output '.')"
 echo ""
 
-metadata=$(echo "$FILTERED_MONGODB_RECORD" | jq '.metadata.tags')
+metadata=$(echo "$FILTERED_MONGODB_RECORD" | jq '.metadata.attributes')
 
 # Compare MongoDB record with expected JSON
 if echo "$metadata" | jq --argjson expected "$EXPECTED_JSON_2" -e 'if . == $expected then true else false end' > /dev/null; then

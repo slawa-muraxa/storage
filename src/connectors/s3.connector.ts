@@ -236,7 +236,6 @@ export class S3Connector implements StorageConnector {
                         size: obj.Size,
                         lastModified: obj.LastModified,
                         active: true,
-                        metadata: {},
                     };
                 });
 
