@@ -17,15 +17,19 @@ export class SObject extends Document {
   name: string;
 
   // The name of the SObject (e.g., file name or object name)
-  @Prop({ required: true })
+  @Prop({ required: false })
   etag: string;
 
   // The name of the SObject (e.g., file name or object name)
-  @Prop({ required: true })
+  @Prop({ required: false })
   size: number;
 
   // The name of the SObject (e.g., file name or object name)
   @Prop({ required: true })
+  created: Date;
+
+  // The name of the SObject (e.g., file name or object name)
+  @Prop({ required: false })
   lastModified: Date;
 
   // Whether the SObject is active or not, useful for flagging deleted or archived objects

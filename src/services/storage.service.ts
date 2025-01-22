@@ -40,6 +40,16 @@ export class StorageService {
     }
   }
 
+  async initObject(object: any) {
+    const sObjectModel = this.getModelForBucket(object.bucket);
+
+    await sObjectModel.updateOne(
+      { id: object.name }, // Use a unique identifier for the object
+      { $set: object }, // Include bucket info for tracking
+      { new: true, upsert: true } // Create the object if it doesn't exist
+    );
+  }
+
   async getAllActiveObjects(): Promise<any[]> {
     try {
       // Fetch all collection names from the database
@@ -162,40 +172,40 @@ export class StorageService {
   ): Promise<any> {
     try {
       const sObjectModel = this.getModelForBucket(bucket);
-  
+
       const updatedObject = await sObjectModel.findOneAndUpdate(
         { name: objectName },
         { $set: { 'metadata.tags': tags } },
         { new: true }
       );
-  
+
       return updatedObject;
     } catch (err) {
       this.logger.error(`Error adding tags to object "${objectName}" in bucket "${bucket}".`, err);
       throw err;
     }
-  }  
+  }
 
   // New tagObject method
   async updateAttributes(
     bucket: string,
     objectName: string,
-    attributes: string []
+    attributes: string[]
   ): Promise<any> {
     try {
       const sObjectModel = this.getModelForBucket(bucket);
-  
+
       const updatedObject = await sObjectModel.findOneAndUpdate(
         { name: objectName },
         { $set: { 'metadata.attributes': attributes } },
         { new: true }
       );
-  
+
       return updatedObject;
     } catch (err) {
       this.logger.error(`Error adding tags to object "${objectName}" in bucket "${bucket}".`, err);
       throw err;
     }
-  }  
+  }
 
 }

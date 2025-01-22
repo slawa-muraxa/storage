@@ -9,6 +9,7 @@ import * as path from 'path';
 import { format } from 'date-fns';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
+import { create } from 'domain';
 
 @Controller('api')
 export class StorageController {
@@ -196,6 +197,8 @@ export class StorageController {
                 // Upload the file to MinIO with metadata
                 await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
                 this.logger.debug(`File uploaded: ${objectName}`);
+
+                await this.db.initObject({id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw'});
 
                 // Remove the file after upload
                 fs.unlinkSync(file.path);
