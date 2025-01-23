@@ -191,7 +191,7 @@ export class StorageController {
                 this.logger.debug(`Processing file: ${file.originalname}`);
                 this.logger.debug(`Metadata for file: ${JSON.stringify(meta)}`);
 
-                const objectName = `${customer}_${format(new Date(date), 'yyMMdd')}/${file.originalname}`;
+                const objectName = `${customer}_${format(new Date(date), 'yyyyMMdd')}/${file.originalname}`;
                 this.logger.debug(`Generated object name: ${objectName}`);
 
                 // Upload the file to MinIO with metadata

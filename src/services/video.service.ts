@@ -127,12 +127,12 @@ export class VideoService {
     publisher: FramePublisher
   ): Promise<string> {
     const metadata = await this.extractMetadata(videoFile);
-    
+
     publisher?.recordVideoMeta(
       metadata.width,
       metadata.height
     );
-    
+
     const absolutePath = path.resolve(videoFile);
 
     // Create output directory for frames
@@ -142,7 +142,7 @@ export class VideoService {
 
     return new Promise((resolve, reject) => {
       const ffmpegCommand = ffmpeg(absolutePath)
-        .on("progress", (progress: any) => 
+        .on("progress", (progress: any) =>
           console.log("Progress:", progress)
         )
         .on("start", (cmdline) => {
@@ -189,12 +189,14 @@ export class VideoService {
   private evaluateFrameQuality(metadata: any): any {
     const qualityCriteria = {
       bitRatePerFrame: {
+        "4K": { high: 1.0, medium: 0.5, low: 0.25 }, // Mbps per frame for 4K
         "1080p": { high: 0.5, medium: 0.25, low: 0.1 }, // Mbps per frame for 1080p
         "720p": { high: 0.3, medium: 0.15, low: 0.08 }, // Mbps per frame for 720p
         "480p": { high: 0.15, medium: 0.08, low: 0.04 }, // Mbps per frame for 480p
       },
       resolution: {
-        "1080p": { width: 1920, height: 1080, standardBitrate: 8000000 }, // Standard bitrate in bps
+        "4K": { width: 3840, height: 2160, standardBitrate: 25000000 }, // Standard bitrate in bps
+        "1080p": { width: 1920, height: 1080, standardBitrate: 8000000 },
         "720p": { width: 1280, height: 720, standardBitrate: 5000000 },
         "480p": { width: 640, height: 480, standardBitrate: 2500000 },
       },
@@ -207,6 +209,11 @@ export class VideoService {
     // Determine resolution category
     let resolutionCategory = "480p";
     if (
+      metadata.width >= qualityCriteria.resolution["4K"].width &&
+      metadata.height >= qualityCriteria.resolution["4K"].height
+    ) {
+      resolutionCategory = "4K";
+    } else if (
       metadata.width >= qualityCriteria.resolution["1080p"].width &&
       metadata.height >= qualityCriteria.resolution["1080p"].height
     ) {
@@ -269,6 +276,7 @@ export class VideoService {
       bitrateRatio,
     };
   }
+
 
   async deleteFile(filePath: string): Promise<void> {
     await fsPromises.unlink(filePath);
