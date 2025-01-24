@@ -73,7 +73,7 @@ services:
       - AUTH_GRPC=muraxa-auth:53001
       - MONGO_URI=mongodb://mongodb:27017
       - DB_NAME=storage
-      - STORAGE_ENDPOINT=minio
+      - STORAGE_HOST=minio
       - STORAGE_PORT=9000
       - STORAGE_ACCESS_KEY=admin
       - STORAGE_SECRET_KEY=adminadmin12

@@ -70,7 +70,7 @@ export const mongooseOptionsFactory = async (configService: ConfigService): Prom
 };
 
 export const minioClientFactory = async (configService: ConfigService): Promise<MinioClient> => {
-  const endPoint = configService.get<string>('STORAGE_ENDPOINT', 'localhost');
+  const endPoint = configService.get<string>('STORAGE_HOST', 'localhost');
   const port = parseInt(configService.get<string>('STORAGE_PORT', '9000'), 10);
   const useSSL = configService.get<string>('STORAGE_USE_SSL', 'false') === 'true'; // Convert string to boolean
   const accessKey = configService.get<string>('STORAGE_ACCESS_KEY', 'admin');
@@ -94,7 +94,7 @@ export const minioClientFactory = async (configService: ConfigService): Promise<
 
 // Factory method for creating S3Client instance
 export const s3ClientFactory = async (configService: ConfigService): Promise<S3Client> => {
-  const endPoint = configService.get<string>('STORAGE_ENDPOINT', 'localhost');
+  const endPoint = configService.get<string>('STORAGE_HOST', 'localhost');
   const port = parseInt(configService.get<string>('STORAGE_PORT', '9000'), 10);
   const useSSL = configService.get<string>('STORAGE_USE_SSL', 'false') === 'true';
   const accessKey = configService.get<string>('STORAGE_ACCESS_KEY', 'admin');
