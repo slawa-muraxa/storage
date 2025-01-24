@@ -10,7 +10,7 @@ import {
     HeadBucketCommand,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
-import { promises as fs, createWriteStream } from 'fs';
+import { promises as fs, createWriteStream, createReadStream } from 'fs';
 import { StorageConnector } from './storage.connector';
 import * as path from 'path';
 
@@ -148,22 +148,24 @@ export class S3Connector implements StorageConnector {
 
     async uploadFile(bucketName: string, objectName: string, filePath: string, metadata: Record<string, any> = {}): Promise<string> {
         try {
-            const fileContent = await fs.readFile(filePath);
-
+            // Create a read stream for the file
+            const fileStream: Readable = createReadStream(filePath);
+    
             // Ensure all metadata values are strings
             const sanitizedMetadata: Record<string, string> = {};
             Object.entries(metadata).forEach(([key, value]) => {
                 sanitizedMetadata[key] = value?.toString() ?? ''; // Convert to string or use empty string as fallback
             });
-
+    
             const command = new PutObjectCommand({
                 Bucket: bucketName,
                 Key: objectName,
-                Body: fileContent,
+                Body: fileStream, // Use the stream as the Body
                 Metadata: sanitizedMetadata,
             });
+    
             const response = await this.s3Client.send(command);
-
+    
             this.logger.log(`Successfully uploaded ${filePath} to ${bucketName}/${objectName}`);
             return response.ETag || '';
         } catch (err) {
