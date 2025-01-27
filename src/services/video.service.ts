@@ -19,12 +19,18 @@ export class VideoService {
             (stream) => stream.codec_type === "video"
           );
           if (videoStream) {
+            const fps = eval(videoStream.avg_frame_rate); // Calculate fps from avg_frame_rate
+            const duration = parseFloat(metadata.format.duration); // Ensure duration is a number
+            const numberOfFrames = videoStream.nb_frames
+              ? parseInt(videoStream.nb_frames, 10)
+              : Math.round(duration * fps); // Calculate frames if nb_frames is missing
+
             const xMetadata = {
-              length: metadata.format.duration,
+              length: duration,
               bitRate: metadata.format.bit_rate,
               codec: videoStream.codec_name,
-              fps: eval(videoStream.avg_frame_rate),
-              numberOfFrames: videoStream.nb_frames,
+              fps,
+              numberOfFrames,
               width: videoStream.width,
               height: videoStream.height,
               quality: null,
@@ -40,6 +46,7 @@ export class VideoService {
       });
     });
   }
+
 
   async cutSelections(
     sourcePath: string,
