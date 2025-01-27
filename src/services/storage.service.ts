@@ -32,7 +32,7 @@ export class StorageService {
         objects.map(async (object) => {
           await sObjectModel.updateOne(
             { id: object.name }, // Use a unique identifier for the object
-            { $set: { ...object, bucket } }, // Include bucket info for tracking
+            { $set: { ...object, bucket, active: true } }, // Include bucket info for tracking
             { new: true, upsert: true } // Create the object if it doesn't exist
           );
         })
@@ -55,6 +55,14 @@ export class StorageService {
 
     return await sObjectModel.findOne(
       { id: objectName }
+    );
+  }
+
+  async deactivateObjects(bucket: string): Promise<any> {
+    const sObjectModel = this.getModelForBucket(bucket);
+
+    return await sObjectModel.updateMany(
+      { active: false }
     );
   }
 

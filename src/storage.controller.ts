@@ -30,6 +30,7 @@ export class StorageController {
             console.log('Start syncing MinIO buckets');
             const buckets = ["l1-raw", "l2-prep", "l3-rel"];
             const newBucketData = await Promise.all(buckets.map(async (bucket) => {
+                await this.db.deactivateObjects(bucket);
                 const objects = await this.storage.listAllObjects(bucket, '');
                 this.logger.debug(`fetched ${objects.length} objects from ${bucket} for syncing`);
                 return { bucket, objects };
