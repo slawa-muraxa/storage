@@ -28,7 +28,11 @@ test_full_request() {
 # Function to perform a partial request
 test_partial_request() {
     echo "Testing partial video stream..."
-    RANGE="bytes=0-99999"
+    # Set the end of the range to the argument passed or default to 99999
+    END_RANGE=${1:-}
+    EXPECTED_LENGTH=${2:-5126806}
+    RANGE="bytes=0-$END_RANGE"
+
     curl -s -o $PARTIAL_RESPONSE -D - -H "Range: $RANGE" "$API_URL?fileName=$TEST_FILE"
 
     # Validate the HTTP status code
@@ -49,8 +53,7 @@ test_partial_request() {
         content_length=$(stat -c%s "$PARTIAL_RESPONSE")
     fi
 
-    expected_length=$((100000))
-    if [[ $content_length -eq $expected_length ]]; then
+    if [[ $content_length -eq $EXPECTED_LENGTH ]]; then
         echo "Partial video stream length validated: $content_length bytes"
     else
         echo "Error: Unexpected length for partial stream: $content_length bytes"
@@ -67,6 +70,7 @@ cleanup() {
 # Run tests
 test_full_request
 test_partial_request
+test_partial_request 9999 10000
 cleanup
 
 echo "All tests passed successfully!"

@@ -50,6 +50,14 @@ export class StorageService {
     );
   }
 
+  async getObject(bucket: string, objectName: string): Promise<any> {
+    const sObjectModel = this.getModelForBucket(bucket);
+
+    return await sObjectModel.findOne(
+      { id: objectName }
+    );
+  }
+
   async getAllActiveObjects(): Promise<any[]> {
     try {
       // Fetch all collection names from the database

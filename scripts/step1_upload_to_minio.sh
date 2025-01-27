@@ -5,7 +5,7 @@ set -e
 
 # MinIO configuration
 MINIO_ALIAS="myminio" # Replace with your MinIO alias
-MINIO_URL="http://localhost:9000" # Replace with your MinIO server URL
+MINIO_URL="http://localhost:10000" # Replace with your MinIO server URL
 MINIO_USER="admin" # Replace with your MinIO root user
 MINIO_PASSWORD="adminadmin12" # Replace with your MinIO root password
 BUCKET_NAME="l1-raw"

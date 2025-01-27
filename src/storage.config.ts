@@ -6,10 +6,10 @@ import { MongooseModuleOptions } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
 import { Client as MinioClient } from 'minio';
 import { S3Client } from '@aws-sdk/client-s3';
-import https from "https";
 
 // GrpcOptions Factory
 export const grpcOptionsFactory = async (configService: ConfigService): Promise<GrpcOptions> => {
+  
   const grpcPort = configService.get<number>('GRPC_PORT') || 53004; // Use GRPC_PORT from .env or default to 53004
 
   return {
@@ -94,13 +94,14 @@ export const minioClientFactory = async (configService: ConfigService): Promise<
 
 // Factory method for creating S3Client instance
 export const s3ClientFactory = async (configService: ConfigService): Promise<S3Client> => {
+
   const endPoint = configService.get<string>('STORAGE_HOST', 'localhost');
   const port = parseInt(configService.get<string>('STORAGE_PORT', '9000'), 10);
   const useSSL = configService.get<string>('STORAGE_USE_SSL', 'false') === 'true';
   const accessKey = configService.get<string>('STORAGE_ACCESS_KEY', 'admin');
   const secretKey = configService.get<string>('STORAGE_SECRET_KEY', 'adminadmin12');
 
-  console.log('MinIO Client Config:', { endPoint, port, useSSL, accessKey, secretKey });
+  console.log('S3 Client Config:', { endPoint, port, useSSL, accessKey, secretKey });
 
   try {
 
@@ -113,6 +114,7 @@ export const s3ClientFactory = async (configService: ConfigService): Promise<S3C
               secretAccessKey: secretKey,
           },
           forcePathStyle: true, // MinIO requires path-style URLs
+          maxAttempts: 3, // Retry on temporary errors
       });
 
       console.log('S3 Client Created Successfully.');

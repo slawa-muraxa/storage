@@ -62,37 +62,36 @@ export class StorageController {
         @Headers('range') range: string,
         @Res() res
     ) {
+        const MAX_CHUNK_SIZE = 100 * 1024 * 1024; // 10 MB
+    
         try {
             this.logger.debug(`Received request to stream file: ${fileName}`);
-
-            const fileStats = await this.storage.getObjectStats('l1-raw', fileName);
-            const fileSize = fileStats.size;
+            //const fileStats = await this.storage.getObjectStats('l1-raw', fileName);
+            const object = await this.db.getObject('l1-raw', fileName);
+            const fileSize = object.size;
             this.logger.debug(`File size retrieved: ${fileSize} bytes`);
-
-            this.logger.debug(`Request range: ${range ? range : 'Full content requested'}`);
-
+    
             if (range) {
                 const parts = range.replace(/bytes=/, "").split("-");
                 const start = parseInt(parts[0], 10);
-                const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-                this.logger.debug(`Parsed range - Start: ${start}, End: ${end}`);
-
+                const end = parts[1] 
+                    ? Math.min(parseInt(parts[1], 10), fileSize - 1)
+                    : Math.min(start + MAX_CHUNK_SIZE - 1, fileSize - 1);
+    
                 if (start >= fileSize) {
                     this.logger.warn(`Requested start (${start}) exceeds file size (${fileSize}).`);
                     return res.status(416).send('Requested range not satisfiable');
                 }
-
+    
                 const chunkSize = (end - start) + 1;
-                this.logger.debug(`Chunk size calculated: ${chunkSize} bytes`);
-
+    
                 res.writeHead(206, {
                     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                     'Accept-Ranges': 'bytes',
                     'Content-Length': chunkSize,
                     'Content-Type': 'video/mp4',
                 });
-                this.logger.debug(`Response headers for partial content set.`);
-
+    
                 const dataStream = await this.storage.getPartialObject('l1-raw', fileName, start, chunkSize);
                 this.logger.debug(`Streaming partial content...`);
                 dataStream.pipe(res);
@@ -101,8 +100,7 @@ export class StorageController {
                     'Content-Length': fileSize,
                     'Content-Type': 'video/mp4',
                 });
-                this.logger.debug(`Response headers for full content set.`);
-
+    
                 const dataStream = await this.storage.getObject('l1-raw', fileName);
                 this.logger.debug(`Streaming full content...`);
                 dataStream.pipe(res);
@@ -111,7 +109,7 @@ export class StorageController {
             this.logger.error(`An error occurred: ${err.message}`, err.stack);
             return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(err.message);
         }
-    }
+    }    
 
     @Post('sync-metadata')
     @UseGuards(AuthGuard)
