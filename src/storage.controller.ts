@@ -63,54 +63,88 @@ export class StorageController {
         @Headers('range') range: string,
         @Res() res
     ) {
-        const MAX_CHUNK_SIZE = 100 * 1024 * 1024; // 10 MB
-    
+        const MAX_CHUNK_SIZE = 30 * 1024 * 1024; // 100 MB
+
         try {
             this.logger.debug(`Received request to stream file: ${fileName}`);
-            //const fileStats = await this.storage.getObjectStats('l1-raw', fileName);
-            const object = await this.db.getObject('l1-raw', fileName);
-            const fileSize = object.size;
+
+            // Get file stats
+            const fileStats = await this.storage.getObjectStats('l1-preview', fileName);
+            //const fileStats = await this.db.getObject('l1-raw', fileName);
+            const fileSize = fileStats.size;
             this.logger.debug(`File size retrieved: ${fileSize} bytes`);
-    
+
             if (range) {
-                const parts = range.replace(/bytes=/, "").split("-");
+                // Parse the range header
+                const parts = range.replace(/bytes=/, '').split('-');
                 const start = parseInt(parts[0], 10);
-                const end = parts[1] 
+                const end = parts[1]
                     ? Math.min(parseInt(parts[1], 10), fileSize - 1)
                     : Math.min(start + MAX_CHUNK_SIZE - 1, fileSize - 1);
-    
+
                 if (start >= fileSize) {
                     this.logger.warn(`Requested start (${start}) exceeds file size (${fileSize}).`);
                     return res.status(416).send('Requested range not satisfiable');
                 }
-    
+
                 const chunkSize = (end - start) + 1;
-    
+
+                // Set headers for partial content
                 res.writeHead(206, {
                     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                     'Accept-Ranges': 'bytes',
                     'Content-Length': chunkSize,
                     'Content-Type': 'video/mp4',
                 });
-    
-                const dataStream = await this.storage.getPartialObject('l1-raw', fileName, start, chunkSize);
-                this.logger.debug(`Streaming partial content...`);
-                dataStream.pipe(res);
+
+                // Stream partial content
+                const dataStream = await this.storage.getPartialObject('l1-preview', fileName, start, chunkSize);
+
+                // Handle client abort
+                const handleAbort = () => {
+                    this.logger.warn('Client aborted connection');
+                    dataStream.destroy(); // Clean up the stream
+                };
+                res.on('close', handleAbort);
+
+                dataStream.on('error', (streamErr) => {
+                    this.logger.error(`Stream error: ${streamErr.message}`, streamErr.stack);
+                    if (!res.headersSent) {
+                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Error during streaming');
+                    }
+                });
+
+                dataStream.pipe(res).on('finish', () => {
+                    this.logger.debug('Partial streaming finished.');
+                });
             } else {
+                // Set headers for full content
                 res.writeHead(200, {
                     'Content-Length': fileSize,
                     'Content-Type': 'video/mp4',
                 });
-    
+
+                // Stream full content
                 const dataStream = await this.storage.getObject('l1-raw', fileName);
-                this.logger.debug(`Streaming full content...`);
-                dataStream.pipe(res);
+
+                dataStream.on('error', (streamErr) => {
+                    this.logger.error(`Stream error: ${streamErr.message}`, streamErr.stack);
+                    if (!res.headersSent) {
+                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Error during streaming');
+                    }
+                });
+
+                dataStream.pipe(res).on('finish', () => {
+                    this.logger.debug('Full streaming finished.');
+                });
             }
         } catch (err) {
             this.logger.error(`An error occurred: ${err.message}`, err.stack);
-            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(err.message);
+            if (!res.headersSent) {
+                return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(err.message);
+            }
         }
-    }    
+    }
 
     @Post('sync-metadata')
     @UseGuards(AuthGuard)
@@ -167,16 +201,13 @@ export class StorageController {
         }
 
         this.logger.debug('Upload File Request Received');
-        this.logger.debug(`Customer: ${customer}, Date: ${date}`);
-        this.logger.debug(`Files: ${JSON.stringify(files)}`);
-        this.logger.debug(`Metadata: ${JSON.stringify(parsedMetadata)}`);
-        this.logger.debug(`Number of files to upload: ${files.length}`);
+        res.setHeader('Content-Type', 'application/json');
+        res.write(JSON.stringify({ status: 'Processing started' }) + '\n');
 
         if (parsedMetadata.length !== files.length) {
             this.logger.error('Metadata count does not match files count');
-            return res.status(HttpStatus.BAD_REQUEST).json({
-                message: 'Metadata count does not match files count',
-            });
+            res.write(JSON.stringify({ status: 'error', message: 'Metadata count does not match files count' }) + '\n');
+            return res.end();
         }
 
         try {
@@ -187,21 +218,39 @@ export class StorageController {
                 const file = files[i];
                 const meta = parsedMetadata[i];
 
-                this.logger.debug(`Processing file: ${file.originalname}`);
-                this.logger.debug(`Metadata for file: ${JSON.stringify(meta)}`);
+                this.logger.debug(`Uploading to storage: ${file.originalname}`);
 
-                const objectName = `${customer}_${format(new Date(date), 'yyyyMMdd')}/${file.originalname}`;
+                const projectName = `${customer}_${format(new Date(date), 'yyyyMMdd')}`;
+                const objectName = `${projectName}/${file.originalname}`;
                 this.logger.debug(`Generated object name: ${objectName}`);
 
-                // Upload the file to MinIO with metadata
+                // Upload raw file to MinIO with metadata
+                res.write(JSON.stringify({ status: 'Uploading raw file', file: file.originalname }) + '\n');
                 await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
-                this.logger.debug(`File uploaded: ${objectName}`);
 
-                await this.db.initObject({id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw'});
+                // Convert video file for preview
+                res.write(JSON.stringify({ status: 'Converting 720p', file: file.originalname }) + '\n');
+                const pathToConverted = `/tmp/muraxa/preview/${objectName}`;
+                await this.video.convertTo720p(file.path, pathToConverted);
+
+                // Upload the file to MinIO with metadata
+                res.write(JSON.stringify({ status: 'Uploading preview file', file: file.originalname }) + '\n');
+                const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted, meta);
+
+                // Extract metadata
+                res.write(JSON.stringify({ status: 'Extracting metadata', file: file.originalname }) + '\n');
+                const metadata = await this.video.extractMetadata(file.path);
+                await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw' });
+                await this.db.updateObjectTargets("l1-raw", objectName, {
+                    serviceName: "STORAGE-PREVIEW",
+                    trackingId: previewETag,
+                    references: { objectName },
+                });
+                await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
 
                 // Remove the file after upload
                 fs.unlinkSync(file.path);
-                this.logger.debug(`File removed from local storage: ${file.path}`);
+                fs.unlinkSync(pathToConverted);
             }
 
             const endTime = Date.now();
@@ -209,17 +258,18 @@ export class StorageController {
             this.logger.debug(`End time: ${endTime}`);
             this.logger.debug(`Upload completed in ${duration} seconds`);
 
-            return res.status(HttpStatus.OK).json({
+            res.write(JSON.stringify({
+                status: 'Completed',
                 message: `Files uploaded successfully in ${duration} seconds`,
-            });
+            }) + '\n');
+            return res.end();
         } catch (error) {
             this.logger.error('Error during file upload:', error);
-            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-                message: 'Error uploading files',
-                error: error.message,
-            });
+            res.write(JSON.stringify({ status: 'error', message: 'Error uploading files', error: error.message }) + '\n');
+            return res.end();
         }
     }
+
 
     @Post('cut-selection')
     @UseGuards(AuthGuard)

@@ -24,6 +24,8 @@ export class S3Connector implements StorageConnector {
     ) { }
 
     async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Readable> {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000); // Abort after 30 seconds
         try {
             const command = new GetObjectCommand({
                 Bucket: bucketName,
@@ -32,11 +34,15 @@ export class S3Connector implements StorageConnector {
                 ...getOpts
             });
 
-            const response = await this.s3Client.send(command);
+            const response = await this.s3Client.send(command, { abortSignal: controller.signal });
             this.logger.log(`Successfully fetched partial object from ${bucketName}/${objectName} at range ${offset}-${offset + length - 1}`);
             return response.Body as Readable;
         } catch (err) {
-            this.logger.error(`Error fetching partial object from ${bucketName}/${objectName} at range ${offset}-${offset + length - 1}:`, err);
+            if (err.name === 'AbortError') {
+                this.logger.error('Request aborted due to timeout');
+            } else {
+                this.logger.error(`Error fetching partial object from ${bucketName}/${objectName} at range ${offset}-${offset + length - 1}:`, err);
+            }
             throw err;
         }
     }
@@ -63,7 +69,7 @@ export class S3Connector implements StorageConnector {
             const response = await this.s3Client.send(command);
 
             // Log success and return the ETag as confirmation
-            this.logger.log(`Successfully uploaded object to ${bucketName}/${targetFilePath}`);
+            //this.logger.log(`Successfully uploaded object to ${bucketName}/${targetFilePath}`);
             return response.ETag || '';
         } catch (err) {
             // Log and re-throw errors for handling upstream
@@ -150,23 +156,23 @@ export class S3Connector implements StorageConnector {
         try {
             // Create a read stream for the file
             const fileStream: Readable = createReadStream(filePath);
-    
+
             // Ensure all metadata values are strings
             const sanitizedMetadata: Record<string, string> = {};
             Object.entries(metadata).forEach(([key, value]) => {
                 sanitizedMetadata[key] = value?.toString() ?? ''; // Convert to string or use empty string as fallback
             });
-    
+
             const command = new PutObjectCommand({
                 Bucket: bucketName,
                 Key: objectName,
                 Body: fileStream, // Use the stream as the Body
                 Metadata: sanitizedMetadata,
             });
-    
+
             const response = await this.s3Client.send(command);
-    
-            this.logger.log(`Successfully uploaded ${filePath} to ${bucketName}/${objectName}`);
+
+            //this.logger.debug(`Successfully uploaded ${filePath} to ${bucketName}/${objectName}`);
             return response.ETag || '';
         } catch (err) {
             this.logger.error(`Error uploading ${filePath} to S3 bucket ${bucketName}:`, err);
@@ -175,7 +181,7 @@ export class S3Connector implements StorageConnector {
     }
 
     async checkAndCreateBuckets(): Promise<void> {
-        const buckets = ['l1-raw', 'l2-prep', 'l3-rel', 'l4-dl'];
+        const buckets = ['l1-raw', 'l1-preview', 'l2-prep', 'l3-rel', 'l4-dl'];
 
         for (const bucket of buckets) {
             try {

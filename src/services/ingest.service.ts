@@ -139,7 +139,7 @@ export class FramePublisher {
 
       this.frames.push(frameObject);
 
-      console.log(`Frame metadata recorded for: ${frameName}`);
+      //console.log(`Frame metadata recorded for: ${frameName}`);
     } catch (err) {
       console.error("Error inserting frame:", err);
     }

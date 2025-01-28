@@ -9,6 +9,45 @@ import { FramePublisher } from "./ingest.service";
 export class VideoService {
   private readonly logger = new Logger(VideoService.name);
 
+  async convertTo720p(
+    inputPath: string,
+    outputPath: string
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.ensureDirectoryExists(outputPath);
+  
+      ffmpeg(inputPath)
+        .output(outputPath)
+        .videoCodec("libx264") // Use H.264 codec
+        .size("1280x720") // Set resolution to 720p
+        .fps(30) // Set frame rate to 30fps
+        .videoBitrate("3000k") // Set video bitrate to 3 Mbps
+        .outputOptions([
+          "-preset medium", // Balance between speed and compression
+          "-profile:v high", // Use High profile for better compatibility
+          "-pix_fmt yuv420p", // Ensure compatibility with most players
+          "-movflags +faststart", // Enable streaming optimization
+        ])
+        .audioCodec("aac") // Use AAC for audio
+        .audioBitrate("128k") // Set audio bitrate to 128 kbps
+        .on("start", (commandLine) => {
+          this.logger.debug(`Started ffmpeg with command: ${commandLine}`);
+        })
+        .on("progress", (progress) => {
+          //this.logger.log(`Processing: ${Math.round(progress.percent)}% done`);
+        })
+        .on("end", () => {
+          this.logger.debug("Video conversion completed successfully");
+          resolve();
+        })
+        .on("error", (err) => {
+          this.logger.debug(`Error during video conversion: ${err.message}`);
+          reject(err);
+        })
+        .run();
+    });
+  }
+
   async extractMetadata(filePath: string): Promise<any> {
     return new Promise((resolve, reject) => {
       ffmpeg.ffprobe(filePath, (err, metadata) => {
@@ -21,7 +60,7 @@ export class VideoService {
           if (videoStream) {
             const fps = eval(videoStream.avg_frame_rate); // Calculate fps from avg_frame_rate
             const duration = parseFloat(metadata.format.duration); // Ensure duration is a number
-            const numberOfFrames = videoStream.nb_frames
+            const numberOfFrames = videoStream.nb_frames && (typeof videoStream.nb_frames === "number")
               ? parseInt(videoStream.nb_frames, 10)
               : Math.round(duration * fps); // Calculate frames if nb_frames is missing
 
@@ -149,18 +188,18 @@ export class VideoService {
 
     return new Promise((resolve, reject) => {
       const ffmpegCommand = ffmpeg(absolutePath)
-        .on("progress", (progress: any) =>
-          console.log("Progress:", progress)
-        )
+        // .on("progress", (progress: any) =>
+        //   console.log("Progress:", progress)
+        // )
         .on("start", (cmdline) => {
-          console.log("Started ffmpeg with command:", cmdline);
+          console.debug("Started ffmpeg with command:", cmdline);
         })
         .on("end", () => {
-          console.log("Frames successfully created");
+          console.debug("Frames successfully created");
           resolve("Frames extracted successfully");
         })
         .on("error", (err) => {
-          console.error("Error while extracting frames:", err);
+          console.debug("Error while extracting frames:", err);
           reject(new Error(`Error extracting frames: ${err.message}`));
         });
 

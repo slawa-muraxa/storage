@@ -85,8 +85,8 @@ export class KafkaConnector implements OnModuleInit, OnModuleDestroy {
         topic,
         messages: [{ value: JSON.stringify(message) }],
       });
-      this.logger.log(
-        `Message sent to Kafka topic '${topic}': ${JSON.stringify(message)}`
+      this.logger.debug(
+        `Message sent to Kafka topic '${topic}': ${JSON.stringify(message).slice(0, 100)}${JSON.stringify(message).length > 100 ? '...' : ''}`
       );
     } catch (error) {
       this.logger.error(

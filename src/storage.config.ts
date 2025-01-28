@@ -6,10 +6,12 @@ import { MongooseModuleOptions } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
 import { Client as MinioClient } from 'minio';
 import { S3Client } from '@aws-sdk/client-s3';
+import { NodeHttpHandler } from "@aws-sdk/node-http-handler";
+import * as http from "http";
 
 // GrpcOptions Factory
 export const grpcOptionsFactory = async (configService: ConfigService): Promise<GrpcOptions> => {
-  
+
   const grpcPort = configService.get<number>('GRPC_PORT') || 53004; // Use GRPC_PORT from .env or default to 53004
 
   return {
@@ -103,24 +105,38 @@ export const s3ClientFactory = async (configService: ConfigService): Promise<S3C
 
   console.log('S3 Client Config:', { endPoint, port, useSSL, accessKey, secretKey });
 
+  const httpHandlerOptions = {
+    connectionTimeout: 3000, // 3 seconds for establishing the connection
+    requestTimeout: 60000, // 1 minute to account for large chunks (100 MB)
+    socketAcquisitionWarningTimeout: 5000, // Warn if sockets are exhausted after 5 seconds
+    httpAgent: new http.Agent({
+      keepAlive: true, // Reuse connections for better performance
+      maxSockets: 50, // Limit concurrent sockets
+      maxFreeSockets: 10, // Maintain some idle sockets for reuse
+      timeout: 60000, // Match the request timeout
+    }),
+    logger: console, // For debugging purposes
+  };
+
   try {
 
-      // Create an S3Client instance 
-      const s3Client = new S3Client({
-          region: 'us-east-1',
-          endpoint: `http${useSSL ? 's' : ''}://${endPoint}:${port}`,
-          credentials: {
-              accessKeyId: accessKey,
-              secretAccessKey: secretKey,
-          },
-          forcePathStyle: true, // MinIO requires path-style URLs
-          maxAttempts: 3, // Retry on temporary errors
-      });
+    // Create an S3Client instance 
+    const s3Client = new S3Client({
+      region: 'us-east-1',
+      endpoint: `http${useSSL ? 's' : ''}://${endPoint}:${port}`,
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      forcePathStyle: true, // MinIO requires path-style URLs
+      maxAttempts: 3, // Retry on temporary errors
+      requestHandler: new NodeHttpHandler(httpHandlerOptions),
+    });
 
-      console.log('S3 Client Created Successfully.');
-      return s3Client;
+    console.log('S3 Client Created Successfully.');
+    return s3Client;
   } catch (error) {
-      console.error('Error creating S3Client:', error);
-      throw error;
+    console.error('Error creating S3Client:', error);
+    throw error;
   }
 };

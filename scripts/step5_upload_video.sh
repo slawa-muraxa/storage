@@ -10,6 +10,7 @@ MINIO_BUCKET="l1-raw"
 # Test data for file upload
 CUSTOMER="test2"
 DATE="2024-11-21"
+METADATA='[{"created":"2025-01-23T20:16:52.174Z"}]'
 FILE_PATH="test/data/bmp_01p.mp4" # Path to the file to be uploaded
 OBJECT_NAME="${CUSTOMER}_$(date -j -f "%Y-%m-%d" "$DATE" "+%y%m%d")/bmp_01p.mp4" # Object name format for macOS
 
@@ -23,6 +24,7 @@ test_upload_file() {
     -F "files=@${FILE_PATH}" \
     -F "customer=${CUSTOMER}" \
     -F "date=${DATE}" \
+    -F "metadata=${METADATA}" \
     "$API_URL/upload")
 
     # Extract HTTP status and response body
