@@ -4,7 +4,7 @@ import { KafkaConnector } from '../connectors/kafka.connector';
 import * as unzipper from 'unzipper';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Cron, CronExpression, Timeout } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class ZipFileProcessorService {
@@ -12,6 +12,8 @@ export class ZipFileProcessorService {
     private readonly logger = new Logger(ZipFileProcessorService.name);
 
     private readonly bucket = 'l4-dl';
+
+    private isProcessing = false; // Ensures sequential execution
 
     constructor(
         @Inject('StorageConnector') private readonly storage: StorageConnector,
@@ -94,8 +96,16 @@ export class ZipFileProcessorService {
         return files;
     }
 
-    @Timeout(10000)
+    @Cron(CronExpression.EVERY_10_SECONDS)
     async checkNewZipFiles(): Promise<void> {
+
+        if (this.isProcessing) {
+            this.logger.warn('Skipping run because previous execution is still ongoing.');
+            return;
+        }
+
+        this.isProcessing = true; // Lock execution
+
         try {
             const objects = await this.storage.listAllObjects('l2-prep', 'annotations/');
             for (const obj of objects) {
@@ -124,7 +134,8 @@ export class ZipFileProcessorService {
             this.logger.error('Error checking or processing zip files:', err);
         } finally {
             // Release the lock
-            await this.storage.releaseLock();
+            //await this.storage.releaseLock();
+            this.isProcessing = false; // Unlock execution after completion
         }
     }
 }
