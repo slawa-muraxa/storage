@@ -11,9 +11,11 @@ import {
 } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
 import { StorageService } from '../services/storage.service'; // Mongo service for database interactions
+import { LineageService, LinkType } from '../services/lineage.service'; // Mongo service for database interactions
 import { AuthGuard } from '../auth/auth.guard.rpc'; // Auth guard for route protection
 import * as path from 'path';
 import { Response } from 'express';
+import { ServiceName } from 'src/schemas/sobject.schema';
 
 @Controller('api/meta')
 export class MetaController {
@@ -22,6 +24,7 @@ export class MetaController {
 
     constructor(
         private readonly db: StorageService,
+        private readonly lineage: LineageService,
     ) { }
 
     /**
@@ -48,13 +51,13 @@ export class MetaController {
     @Post('update-target')
     @UseGuards(AuthGuard)
     async updateTarget(
-        @Body() body: { bucket: string; objectName: string; target: { serviceName: string; trackingId: string; references: any } },
+        @Body() body: { bucket: string; objectName: string; target: { serviceName: ServiceName; trackingId: string; references: any } },
         @Res() res
     ) {
         const { bucket, objectName, target } = body;
 
         try {
-            const updatedObject = await this.db.updateObjectTargets(bucket, objectName, target);
+            const updatedObject = await this.lineage.updateObjectLink(bucket, objectName, target, LinkType.TARGET);
             if (!updatedObject) {
                 return res.status(HttpStatus.NOT_FOUND).json({ error: 'Object not found' });
             }
@@ -116,11 +119,11 @@ export class MetaController {
      * gRPC method to update object targets
      */
     @GrpcMethod('MetaService', 'UpdateTarget')
-    async updateTargetGrpc(data: { bucket: string; objectName: string; target: { serviceName: string; trackingId: string; references: any } }) {
+    async updateTargetGrpc(data: { bucket: string; objectName: string; target: { serviceName: ServiceName; trackingId: string; references: any } }) {
         const { bucket, objectName, target } = data;
 
         try {
-            const updatedObject = await this.db.updateObjectTargets(bucket, objectName, target);
+            const updatedObject = await this.lineage.updateObjectLink(bucket, objectName, target, LinkType.TARGET);
             if (!updatedObject) {
                 return { success: false, message: 'Object not found' };
             }

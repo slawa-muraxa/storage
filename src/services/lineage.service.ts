@@ -1,12 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Model, Connection } from 'mongoose';
-import { SObject, SObjectSchema } from '../schemas/sobject.schema'; // Assuming you have an ObjectData schema
+import { SObject, SObjectSchema, ServiceName } from '../schemas/sobject.schema'; // Assuming you have an ObjectData schema
 import { InjectConnection } from '@nestjs/mongoose';
 
-@Injectable()
-export class StorageService {
+const ServiceDetails: Record<ServiceName, { bucket: string }> = {
+  [ServiceName.CVAT]: { bucket: undefined },
+  [ServiceName.STORAGE_PREVIEW]: { bucket: 'l1-preview' },
+  [ServiceName.STORAGE_VERSION]: { bucket: 'l1-raw' },
+  [ServiceName.STORAGE_LAKE]: { bucket: "l4-dl" }
+};
 
-  private readonly logger = new Logger(StorageService.name);
+// Define enum before usage
+export enum LinkType {
+  SOURCE = "sources",
+  TARGET = "targets"
+}
+
+@Injectable()
+export class LineageService {
+
+  private readonly logger = new Logger(LineageService.name);
   private models: Map<string, Model<SObject>> = new Map();
 
   constructor(@InjectConnection() private readonly connection: Connection) { }
@@ -24,10 +37,11 @@ export class StorageService {
   }
 
 
-  async updateObjectTargets(
+  async updateObjectLink(
     bucket: string,
     objectName: string,
-    target: { serviceName: ServiceName; trackingId: string; references: any }
+    target: { serviceName: ServiceName; trackingId: string; references: any },
+    linkType: LinkType
   ): Promise<any> {
     try {
       // Get the model for the specified bucket
@@ -38,7 +52,7 @@ export class StorageService {
 
       if (updatedObject) {
         // Check if the globalId already exists in the metadata.targets array
-        const existingTarget = updatedObject.metadata?.targets?.find(
+        const existingTarget = updatedObject.targets.find(
           (t: { trackingId: string }) => t.trackingId === target.trackingId
         );
 
@@ -54,7 +68,7 @@ export class StorageService {
         const result = await sObjectModel.findOneAndUpdate(
           { id: objectName }, // Query by object ID
           {
-            $push: { 'metadata.targets': target }, // Append the new target to the targets array
+            $push: { [linkType]: target }, // Append the new target to the targets array
           },
           {
             new: true, // Return the updated document
@@ -80,4 +94,57 @@ export class StorageService {
     }
   }
 
+  async verifyObjectTargets(
+    bucket: string,
+    objectName: string,
+  ): Promise<any> {
+    try {
+      // Get the model for the specified bucket
+      const sObjectModel = this.getModelForBucket(bucket);
+  
+      // Find the object to check if the globalId already exists
+      const verifiedObject = await sObjectModel.findOne({ id: objectName });
+  
+      if (!verifiedObject) {
+        this.logger.warn(`Object with id "${objectName}" not found in bucket "${bucket}".`);
+        return;
+      }
+  
+      const trackingIdsToRemove: string[] = [];
+  
+      for (const target of verifiedObject.targets || []) {
+        const targetBucket = ServiceDetails[target.serviceName]?.bucket;
+        if (!targetBucket) continue;
+  
+        const targetObjectModel = this.getModelForBucket(targetBucket);
+        const targetObject = await targetObjectModel.findOne({ etag: target.trackingId });
+  
+        if (!targetObject) {
+          trackingIdsToRemove.push(target.trackingId);
+        }
+      }
+  
+      if (trackingIdsToRemove.length > 0) {
+        await sObjectModel.findOneAndUpdate(
+          { id: objectName }, // Query by object ID
+          {
+            $pull: {
+              'targets': { trackingId: { $in: trackingIdsToRemove } } // Remove matching targets
+            }
+          },
+          {
+            new: true, // Return the updated document
+            upsert: false, // Do not create if the document doesn't exist
+          }
+        );
+      }
+    } catch (err) {
+      this.logger.error(
+        `Error updating targets for object "${objectName}" in bucket "${bucket}".`,
+        err
+      );
+      throw err;
+    }
+  }
+  
 }

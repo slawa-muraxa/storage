@@ -1,5 +1,0 @@
-enum ServiceName {
-    CVAT = 'CVAT',
-    STORAGE_PREVIEW = 'STORAGE_PREVIEW',
-    STORAGE_VERSION = 'STORAGE_VERSION',
-}

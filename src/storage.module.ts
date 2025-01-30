@@ -4,12 +4,13 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SObject, SObjectSchema } from './schemas/sobject.schema';
 import { Tag, TagSchema } from './schemas/tag.schema';
 import { ClientsModule } from '@nestjs/microservices';
-import { MinioConnector } from './connectors/minio.connector';
+// import { MinioConnector } from './connectors/minio.connector';
 import { KafkaConnector } from './connectors/kafka.connector';
 import { VideoService } from './services/video.service';
 import { StorageController } from './storage.controller';
 import { MetaController } from './smeta/smeta.controller';
 import { StorageService } from './services/storage.service';
+import { LineageService } from './services/lineage.service';
 import { TagService } from './tags/tag.service';
 import { TagController } from './tags/tag.controller';
 import { IngestService } from './services/ingest.service';
@@ -65,6 +66,7 @@ import { S3Connector } from './connectors/s3.connector';
   providers: [
     ZipFileProcessorService,
     KafkaConnector,
+    LineageService,
     StorageService,
     VideoService,
     IngestService,

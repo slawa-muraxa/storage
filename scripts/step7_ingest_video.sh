@@ -21,17 +21,45 @@ EXPECTED_JSON='{
   "bucket": "l1-raw",
   "etag": "c851844bfe74d9da418cc21bf2b0edd4",
   "name": "test/bmp_13m.mp4",
+  "original": true,
+  "preview": false,
   "size": 2099183,
+  "sources": [],
+  "targets": [
+    {
+      "serviceName": "STORAGE_VERSION",
+      "trackingId": "\"a4303bdb671045fa5f34f39d178ef83f\"",
+      "references": {
+        "objectName": "test/bmp_13m_1738257486456.mp4"
+      },
+      "_id": "679bb44ed2805df52802f52d"
+    },
+    {
+      "serviceName": "STORAGE_LAKE",
+      "trackingId": "bmp_13m.mp4",
+      "references": {
+        "targetPath": "alpha-project/bmp_13m.mp4/images/default"
+      },
+      "_id": "679bb474d2805df52802f54a"
+    }
+  ],
+  "activeVersion": "test/bmp_13m_1738257486456.mp4",
   "metadata": {
-    "targets": [
-      {
-        "serviceName": "LAKE",
-        "trackingId": "bmp_13m.mp4",
-        "references": {
-          "targetPath": "alpha-project/bmp_13m.mp4/images/default"
-        }
+    "video": {
+      "length": 26.194921,
+      "bitRate": 91321,
+      "codec": "h264",
+      "fps": 26.510130657072523,
+      "numberOfFrames": 14,
+      "width": 904,
+      "height": 720,
+      "quality": {
+        "qualityScore": 1,
+        "qualityDescription": "Low",
+        "bitRatePerFrame": 0.0034447585785714286,
+        "bitrateRatio": 0.0365284
       }
-    ]
+    }
   }
 }'
 

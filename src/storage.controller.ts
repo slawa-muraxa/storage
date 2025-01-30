@@ -3,13 +3,14 @@ import { StorageConnector } from './connectors/storage.connector';
 import { VideoService } from './services/video.service';
 import { IngestService } from './services/ingest.service';
 import { StorageService } from './services/storage.service';  // Mongo service to interact with your database
+import { LineageService, LinkType } from './services/lineage.service';  // Mongo service to interact with your database
 import { AuthGuard } from './auth/auth.guard.rpc';  // Auth guard for route protection
 import * as fs from 'fs';
 import * as path from 'path';
 import { format } from 'date-fns';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { create } from 'domain';
+import { ServiceName } from './schemas/sobject.schema';
 
 @Controller('api')
 export class StorageController {
@@ -21,6 +22,7 @@ export class StorageController {
         private readonly video: VideoService,
         private readonly db: StorageService,
         private readonly ingest: IngestService,
+        private readonly lineage: LineageService,
     ) { }
 
     @Get('sync-minio-structure')
@@ -28,7 +30,7 @@ export class StorageController {
     async syncMinioStructure(@Req() req, @Res() res) {
         try {
             console.log('Start syncing MinIO buckets');
-            const buckets = ["l1-raw", "l2-prep", "l3-rel"];
+            const buckets = [ "l1-raw", "l1-preview", "l2-prep", "l3-rel"];
             const newBucketData = await Promise.all(buckets.map(async (bucket) => {
                 await this.db.deactivateObjects(bucket);
                 const objects = await this.storage.listAllObjects(bucket, '');
@@ -230,11 +232,11 @@ export class StorageController {
                 res.write(JSON.stringify({ status: 'Extracting metadata', file: file.originalname }) + '\n');
                 const metadata = await this.video.extractMetadata(file.path);
                 await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw', preview: true });
-                await this.db.updateObjectTargets("l1-raw", objectName, {
-                    serviceName: "STORAGE-PREVIEW",
+                await this.lineage.updateObjectLink("l1-raw", objectName, {
+                    serviceName: ServiceName.STORAGE_PREVIEW,
                     trackingId: previewETag,
                     references: { objectName },
-                });
+                }, LinkType.TARGET);
                 await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
 
                 // Remove the file after upload
@@ -306,13 +308,19 @@ export class StorageController {
             this.logger.debug('Upload completed.');
 
             // Step 4: Update DB
+            const object = await this.db.getObject("l1-raw", objectName);
             const metadata = await this.video.extractMetadata(destinationPath);
-            await this.db.initObject({ id: objectName, name: objectName, created: new Date(), bucket: 'l1-raw', original: false });
-            await this.db.updateObjectTargets("l1-raw", objectName, {
-                serviceName: "STORAGE-VERSION",
+            await this.db.initObject({ id: uploadObjectName, name: uploadObjectName, created: new Date(), bucket: 'l1-raw', original: false });
+            await this.lineage.updateObjectLink("l1-raw", objectName, {
+                serviceName: ServiceName.STORAGE_VERSION,
                 trackingId: etag,
                 references: { objectName: uploadObjectName },
-            });
+            }, LinkType.TARGET);
+            await this.lineage.updateObjectLink("l1-raw", uploadObjectName, {
+                serviceName: ServiceName.STORAGE_VERSION,
+                trackingId: object.etag,
+                references: { objectName: objectName },
+            }, LinkType.SOURCE);
             await this.db.setActiveVersion("l1-raw", objectName, uploadObjectName);
             await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
 

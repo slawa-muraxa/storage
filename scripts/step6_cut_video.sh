@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Configuration
+API_URL="http://localhost:3004/api" # API base URL
 ENDPOINT="http://localhost:3004/api/cut-selection" # Replace with your actual endpoint
 BUCKET_NAME="l1-raw"
 OBJECT_NAME="test/bmp_13m.mp4" # Replace with the name of your test video in MinIO
@@ -21,9 +22,10 @@ RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "$ENDPOINT" \
 HTTP_CODE=$(echo "$RESPONSE" | grep "HTTP_CODE:" | awk -F":" '{print $2}')
 BODY=$(echo "$RESPONSE" | sed '/HTTP_CODE:/d')
 
+echo "Response: $BODY"
+
 if [ "$HTTP_CODE" -ne 200 ]; then
     echo "Error: Endpoint returned HTTP $HTTP_CODE"
-    echo "Response: $BODY"
     exit 1
 fi
 
@@ -49,16 +51,61 @@ fi
 
 echo "Processed file $PROCESSED_OBJECT found in MinIO."
 
-# Step 3: Compare file sizes
-echo "Fetching file sizes for comparison..."
-ORIGINAL_SIZE=$(mc stat "$MC_ALIAS/$BUCKET_NAME/$OBJECT_NAME" | grep "Size" | awk '{print $2}')
-PROCESSED_SIZE=$(mc stat "$MC_ALIAS/$BUCKET_NAME/$PROCESSED_OBJECT" | grep "Size" | awk '{print $2}')
+# Step 4: Call sync-minio-structure and validate response
+echo "Calling sync-minio-structure endpoint..."
+fetch_response=$(curl -s -w "\n%{http_code}" -X GET "$API_URL/sync-minio-structure" \
+-H "Authorization: Bearer YOUR_AUTH_TOKEN" \
+-H "Content-Type: application/json")
 
-echo "Original file size: $ORIGINAL_SIZE bytes"
-echo "Processed file size: $PROCESSED_SIZE bytes"
+# Extract response body and status code
+fetch_response_body=$(echo "$fetch_response" | sed '$ d')
+fetch_status_code=$(echo "$fetch_response" | tail -n1)
 
-if [ "$PROCESSED_SIZE" -ge "$ORIGINAL_SIZE" ]; then
-    echo "Error: Processed file size ($PROCESSED_SIZE bytes) is not smaller than original file size ($ORIGINAL_SIZE bytes). Cutting may have failed."
+# Pretty print the response body
+echo "Formatted JSON Response from sync-minio-structure:"
+echo "$fetch_response_body" | jq
+
+# Validate the number of objects in the l1-raw bucket
+object_count=$(echo "$fetch_response_body" | jq '.["l1-raw"] | length')
+
+# Validate the number of objects in the l1-preview bucket
+preview_count=$(echo "$fetch_response_body" | jq '.["l1-preview"] | length')
+
+# Validate the proper amount of target
+targets_count=$(echo "$fetch_response_body" | jq '[.["l1-raw"][], .["l1-preview"][] | select(.targets | length == 1)] | length')
+
+# Validate the proper amount of target
+sources_count=$(echo "$fetch_response_body" | jq '[.["l1-raw"][], .["l1-preview"][] | select(.sources | length == 1)] | length')
+
+# Validate the number of targets in the response
+if [[ $fetch_status_code -eq 200 && $targets_count -eq 2 ]]; then
+    echo "sync-minio-structure successful. 2 targets found."
+else
+    echo "Error: updated targets mismatch"
+    exit 1
+fi
+
+# Validate the number of sources in the response
+if [[ $fetch_status_code -eq 200 && $sources_count -eq 1 ]]; then
+    echo "sync-minio-structure successful. 1 source found."
+else
+    echo "Error: updated sources mismatch"
+    exit 1
+fi
+
+# Validate the number of objects in the response
+if [[ $fetch_status_code -eq 200 && $object_count -eq 5 ]]; then
+    echo "sync-minio-structure successful. 4 raw objects found."
+else
+    echo "Error: raw objects mismatch"
+    exit 1
+fi
+
+# Validate the number of objects in the response
+if [[ $fetch_status_code -eq 200 && $preview_count -eq 1 ]]; then
+    echo "sync-minio-structure successful. 1 preview object found."
+else
+    echo "Error: preview objects mismatch"
     exit 1
 fi
 
