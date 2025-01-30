@@ -10,6 +10,6 @@ export interface StorageConnector {
     removeObject(bucket: string, name: string): Promise<void>;
     acquireLock(): Promise<boolean>;
     releaseLock(): Promise<void>;
-    getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts?: object): Promise<Readable>;
+    getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts?: object): Promise<Buffer>;
     getObjectStats(bucketName: string, objectName: string): Promise<{size: number}>;
 }

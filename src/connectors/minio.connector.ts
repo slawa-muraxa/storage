@@ -80,13 +80,20 @@ export class MinioConnector implements StorageConnector {
         }
     }
 
-    async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Readable> {
+    async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Buffer> {
         try {
             // Use MinIO's getPartialObject API to fetch a part of the object starting from 'offset' and with a given 'length'
             const dataStream = await this.minioClient.getPartialObject(bucketName, objectName, offset, length, getOpts);
 
             this.logger.log(`Successfully fetched partial object ${objectName} from bucket ${bucketName}, offset: ${offset}, length: ${length}`);
-            return dataStream as Readable;
+
+            // Read stream into memory and convert to Buffer
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of dataStream as Readable) {
+                chunks.push(chunk);
+            }
+
+            return Buffer.concat(chunks);
         } catch (err) {
             this.logger.error(`Error fetching partial object ${objectName} from MinIO bucket ${bucketName}:`, err);
             throw err;

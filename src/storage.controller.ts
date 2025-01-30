@@ -89,6 +89,9 @@ export class StorageController {
 
                 const chunkSize = (end - start) + 1;
 
+                // Stream partial content
+                const buffer = await this.storage.getPartialObject('l1-preview', fileName, start, chunkSize);
+
                 // Set headers for partial content
                 res.writeHead(206, {
                     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
@@ -97,26 +100,9 @@ export class StorageController {
                     'Content-Type': 'video/mp4',
                 });
 
-                // Stream partial content
-                const dataStream = await this.storage.getPartialObject('l1-preview', fileName, start, chunkSize);
-
-                // Handle client abort
-                const handleAbort = () => {
-                    this.logger.warn('Client aborted connection');
-                    dataStream.destroy(); // Clean up the stream
-                };
-                res.on('close', handleAbort);
-
-                dataStream.on('error', (streamErr) => {
-                    this.logger.error(`Stream error: ${streamErr.message}`, streamErr.stack);
-                    if (!res.headersSent) {
-                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Error during streaming');
-                    }
-                });
-
-                dataStream.pipe(res).on('finish', () => {
-                    this.logger.debug('Partial streaming finished.');
-                });
+                // Send the buffer and immediately close the response
+                res.end(buffer);
+                this.logger.debug('Partial streaming finished.');
             } else {
                 // Set headers for full content
                 res.writeHead(200, {

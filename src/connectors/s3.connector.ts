@@ -23,7 +23,7 @@ export class S3Connector implements StorageConnector {
         @Inject('S3_CLIENT') private readonly s3Client: S3Client,
     ) { }
 
-    async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Readable> {
+    async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Buffer> {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000); // Abort after 30 seconds
         try {
@@ -35,8 +35,15 @@ export class S3Connector implements StorageConnector {
             });
 
             const response = await this.s3Client.send(command, { abortSignal: controller.signal });
-            this.logger.log(`Successfully fetched partial object from ${bucketName}/${objectName} at range ${offset}-${offset + length - 1}`);
-            return response.Body as Readable;
+
+            // Read stream into memory and convert to Buffer
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of response.Body as Readable) {
+                chunks.push(chunk);
+            }
+
+            this.logger.debug(`Successfully buffered ${bucketName}/${objectName} at range ${offset}-${offset + length - 1}`);
+            return Buffer.concat(chunks);
         } catch (err) {
             if (err.name === 'AbortError') {
                 this.logger.error('Request aborted due to timeout');
