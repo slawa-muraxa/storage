@@ -66,6 +66,15 @@ export class StorageService {
     );
   }
 
+  async setActiveVersion(bucket: string, objectName: string, version: string): Promise<any> {
+    const sObjectModel = this.getModelForBucket(bucket);
+
+    return await sObjectModel.updateOne(
+      { id: objectName},
+      { activeVersion: version }
+    );
+  }
+
   async getAllActiveObjects(): Promise<any[]> {
     try {
       // Fetch all collection names from the database
@@ -139,13 +148,13 @@ export class StorageService {
       if (updatedObject) {
         // Check if the globalId already exists in the metadata.targets array
         const existingTarget = updatedObject.metadata?.targets?.find(
-          (t: { globalId: string }) => t.globalId === target.trackingId
+          (t: { trackingId: string }) => t.trackingId === target.trackingId
         );
 
         // If the globalId is the same, do not push a new target
         if (existingTarget) {
           this.logger.warn(
-            `Target with globalId "${target.trackingId}" already exists for object "${objectName}".`
+            `Target with tracking id "${target.trackingId}" already exists for object "${objectName}".`
           );
           return updatedObject; // Return the existing object without any changes
         }

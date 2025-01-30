@@ -208,7 +208,7 @@ export class S3Connector implements StorageConnector {
             const command = new HeadObjectCommand({ Bucket: bucketName, Key: objectName });
             const response = await this.s3Client.send(command);
 
-            this.logger.log(`Successfully fetched stats for ${objectName} from bucket ${bucketName}`);
+            this.logger.debug(`Successfully fetched stats for ${objectName} from bucket ${bucketName}`);
             return { size: response.ContentLength };
         } catch (err) {
             this.logger.error(`Error fetching stats for ${objectName} from S3 bucket ${bucketName}:`, err);

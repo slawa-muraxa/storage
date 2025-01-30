@@ -68,11 +68,14 @@ export class StorageController {
         try {
             this.logger.debug(`Received request to stream file: ${fileName}`);
 
+            const sObject = await this.db.getObject('l1-raw', fileName);
+            const previewBucket = sObject?.preview ? "l1-preview" : "l1-raw"; 
+
             // Get file stats
-            const fileStats = await this.storage.getObjectStats('l1-preview', fileName);
+            const fileStats = await this.storage.getObjectStats(previewBucket, fileName);
             //const fileStats = await this.db.getObject('l1-raw', fileName);
             const fileSize = fileStats.size;
-            this.logger.debug(`File size retrieved: ${fileSize} bytes`);
+            this.logger.debug(`File size retrieved (${previewBucket}): ${fileSize} bytes`);
 
             if (range) {
                 // Parse the range header
@@ -90,7 +93,7 @@ export class StorageController {
                 const chunkSize = (end - start) + 1;
 
                 // Stream partial content
-                const buffer = await this.storage.getPartialObject('l1-preview', fileName, start, chunkSize);
+                const buffer = await this.storage.getPartialObject(previewBucket, fileName, start, chunkSize);
 
                 // Set headers for partial content
                 res.writeHead(206, {
@@ -226,7 +229,7 @@ export class StorageController {
                 // Extract metadata
                 res.write(JSON.stringify({ status: 'Extracting metadata', file: file.originalname }) + '\n');
                 const metadata = await this.video.extractMetadata(file.path);
-                await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw' });
+                await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw', preview: true });
                 await this.db.updateObjectTargets("l1-raw", objectName, {
                     serviceName: "STORAGE-PREVIEW",
                     trackingId: previewETag,
@@ -263,9 +266,10 @@ export class StorageController {
         @Body() body: { bucketName: string; objectName: string; selections: any[]; taskName: string },
         @Res() res,
     ) {
+        const tmpFolder = '/tmp/muraxa/storage'
         const { bucketName, objectName, selections } = body;
-        const sourcePath = `./downloads/${objectName}`;
-        const destinationPath = `./processed/${objectName}_v1.mp4`;
+        const sourcePath = path.join(tmpFolder, `downloads/${objectName}`);
+        const destinationPath = path.join(tmpFolder, `processed/${objectName}_v1.mp4`);
 
         const startTime = Date.now();
         // Extract the base name (without extension) and file extension
@@ -298,8 +302,19 @@ export class StorageController {
 
             // Step 3: Upload the processed file back to MinIO
             this.logger.debug(`Uploading processed file to MinIO as ${uploadObjectName}...`);
-            await this.storage.uploadFile(bucketName, uploadObjectName, destinationPath);
+            const etag = await this.storage.uploadFile(bucketName, uploadObjectName, destinationPath);
             this.logger.debug('Upload completed.');
+
+            // Step 4: Update DB
+            const metadata = await this.video.extractMetadata(destinationPath);
+            await this.db.initObject({ id: objectName, name: objectName, created: new Date(), bucket: 'l1-raw', original: false });
+            await this.db.updateObjectTargets("l1-raw", objectName, {
+                serviceName: "STORAGE-VERSION",
+                trackingId: etag,
+                references: { objectName: uploadObjectName },
+            });
+            await this.db.setActiveVersion("l1-raw", objectName, uploadObjectName);
+            await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
 
             // Step 4: Clean up temporary files
             this.logger.debug('Cleaning up temporary files...');

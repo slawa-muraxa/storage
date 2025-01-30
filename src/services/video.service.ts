@@ -15,7 +15,7 @@ export class VideoService {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ensureDirectoryExists(outputPath);
-  
+
       ffmpeg(inputPath)
         .output(outputPath)
         .videoCodec("libx264") // Use H.264 codec
@@ -107,18 +107,21 @@ export class VideoService {
         return;
       }
 
+      const tmpFolder = '/tmp/muraxa/storage/cut'
+      const fileName = path.basename(sourcePath);
       const tempFiles = [];
       let segmentIndex = 0;
+      const fileListPath = path.join(tmpFolder, `${fileName}_list.txt`);
+      this.ensureDirectoryExists(fileListPath);
 
       const processSegment = (from, to, callback) => {
-        const fileName = path.basename(sourcePath);
-        const tempFile = `./tmp/temp_${fileName}_segment_${segmentIndex}.mp4`;
+        const tempFile = path.join(tmpFolder, `temp_${fileName}_segment_${segmentIndex}.mp4`);
         this.ensureDirectoryExists(tempFile);
         tempFiles.push(tempFile);
 
         ffmpeg(sourcePath)
-          .inputOptions(`-ss ${from}`)
-          .inputOptions(`-t ${to - from}`)
+          .inputOptions(["-ss", `${from}`])
+          .inputOptions(["-to", `${to}`])
           .outputOptions("-c copy")
           .output(tempFile)
           .on("end", () => {
@@ -142,24 +145,32 @@ export class VideoService {
       };
 
       const concatenateSegments = () => {
-        const command = ffmpeg();
 
-        tempFiles.forEach((tempFile) => {
-          command.input(tempFile);
-        });
+        // Generate file list for FFmpeg concat method
+        fs.writeFileSync(
+          fileListPath,
+          tempFiles.map((file) => `file '${file}'`).join("\n")
+        );
 
-        command
-          .on("end", () => {
-            // Clean up temporary files
-            tempFiles.forEach((file) => fs.unlinkSync(file));
-            console.log("Processing finished successfully");
-            resolve();
-          })
-          .on("error", (err) => {
-            console.error("Error during concatenation:", err);
-            reject(err);
-          })
-          .mergeToFile(destinationPath);
+        ffmpeg()
+        .input(fileListPath)
+        .inputOptions("-f concat")
+        .inputOptions("-safe 0")
+        .outputOptions("-c copy")
+        .output(destinationPath)
+        .on("end", () => {
+          // Clean up temporary files
+          tempFiles.forEach((file) => fs.unlinkSync(file));
+          fs.unlinkSync(fileListPath);
+          console.log("Processing finished successfully");
+          resolve();
+        })
+        .on("error", (err) => {
+          console.error("Error during concatenation:", err);
+          reject(err);
+        })
+        .run();
+
       };
 
       processSelections(0);
