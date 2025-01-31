@@ -322,7 +322,7 @@ export class StorageController {
                 references: { objectName: objectName },
             }, LinkType.SOURCE);
             await this.db.setActiveVersion("l1-raw", objectName, uploadObjectName);
-            await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
+            await this.db.storeVideoMetadata('l1-raw', uploadObjectName, metadata);
 
             // Step 4: Clean up temporary files
             this.logger.debug('Cleaning up temporary files...');
