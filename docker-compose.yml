@@ -1,0 +1,98 @@
+services:
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "10000:9000"
+      - "10001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: adminadmin12
+    volumes:
+      - minio-data:/data
+      - minio-config:/root/.minio
+    command: server /data --console-address ":9001"
+    restart: always
+    networks:
+      - shared_network
+
+  # ceph:
+  #   image: ceph/daemon:latest-mimic
+  #   container_name: ceph
+  #   environment:
+  #     MON_IP: 127.0.0.1
+  #     CEPH_PUBLIC_NETWORK: 0.0.0.0/0
+  #     CEPH_DAEMON: DEMO
+  #   ports:
+  #     - "6789:6789"  # Ceph Monitor port
+  #     - "7480:7480"  # RADOS Gateway (S3-compatible API)
+  #   privileged: true
+  #   networks:
+  #     - shared_network
+
+  mongodb:
+    image: mongo:8.0-rc
+    container_name: mongodb
+    ports:
+      - "37017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./mongodb/init:/docker-entrypoint-initdb.d
+    networks:
+      - shared_network
+
+  broker:
+    image: apache/kafka:latest
+    container_name: broker
+    ports:
+      - "9092:9092" # Expose Kafka broker port
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,DOCKER://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,DOCKER://broker:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,DOCKER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCEdocker _DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 1
+    networks:
+      - shared_network
+
+  muraxa-storage:
+    image: murant/muraxa-storage:latest
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=dev
+      - AUTH_SWITCH=OFF
+      - AUTH_GRPC=muraxa-auth:53001
+      - MONGO_URI=mongodb://mongodb:27017
+      - DB_NAME=storage
+      - STORAGE_HOST=minio
+      - STORAGE_PORT=9000
+      - STORAGE_ACCESS_KEY=admin
+      - STORAGE_SECRET_KEY=adminadmin12
+      - PORT=3004
+      - KAFKA_BROKER_URL=broker:9094
+    depends_on:
+      - mongodb
+      - broker
+    command: dockerize -wait tcp://broker:9094 -timeout 500s node dist/main
+    networks:
+      - shared_network
+
+volumes:
+  mongo-data:
+  minio-data:
+    driver: local
+  minio-config:
+    driver: local
+
+networks:
+  shared_network:
+    driver: bridge
