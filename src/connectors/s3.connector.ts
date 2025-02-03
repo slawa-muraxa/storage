@@ -196,7 +196,7 @@ export class S3Connector implements StorageConnector {
             const response = await this.s3Client.send(command);
 
             //this.logger.debug(`Successfully uploaded ${filePath} to ${bucketName}/${objectName}`);
-            return response.ETag || '';
+            return (response.ETag || '').replace(/"/g, '');
         } catch (err) {
             this.logger.error(`Error uploading ${filePath} to S3 bucket ${bucketName}:`, err);
             throw err;

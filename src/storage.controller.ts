@@ -217,14 +217,14 @@ export class StorageController {
 
                 // Upload raw file to MinIO with metadata
                 res.write(JSON.stringify({ status: 'Uploading raw file', file: file.originalname }) + '\n');
-                await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
+                const rawETag = await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
 
                 // Convert video file for preview
                 res.write(JSON.stringify({ status: 'Converting 720p', file: file.originalname }) + '\n');
                 const pathToConverted = `/tmp/muraxa/preview/${objectName}`;
                 await this.video.convertTo720p(file.path, pathToConverted);
 
-                // Upload the file to MinIO with metadata
+                // Upload preview file to MinIO with metadata
                 res.write(JSON.stringify({ status: 'Uploading preview file', file: file.originalname }) + '\n');
                 const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted, meta);
 
@@ -232,11 +232,17 @@ export class StorageController {
                 res.write(JSON.stringify({ status: 'Extracting metadata', file: file.originalname }) + '\n');
                 const metadata = await this.video.extractMetadata(file.path);
                 await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw', preview: true });
+                await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-preview', preview: false });
                 await this.lineage.updateObjectLink("l1-raw", objectName, {
                     serviceName: ServiceName.STORAGE_PREVIEW,
                     trackingId: previewETag,
                     references: { objectName },
                 }, LinkType.TARGET);
+                await this.lineage.updateObjectLink("l1-preview", objectName, {
+                    serviceName: ServiceName.STORAGE_VERSION,
+                    trackingId: rawETag,
+                    references: { objectName },
+                }, LinkType.SOURCE);
                 await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
 
                 // Remove the file after upload
