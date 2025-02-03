@@ -10,7 +10,7 @@ import * as path from 'path';
 import { format } from 'date-fns';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { ServiceName } from './schemas/sobject.schema';
+import { ServiceName, SObject } from './schemas/sobject.schema';
 
 @Controller('api')
 export class StorageController {
@@ -274,6 +274,88 @@ export class StorageController {
     
                 // Remove the raw file after upload
                 fs.unlinkSync(file.path);
+            }
+    
+            const endTime = Date.now();
+            const duration = (endTime - startTime) / 1000;
+            this.logger.debug(`End time: ${endTime}`);
+            this.logger.debug(`Upload completed in ${duration} seconds`);
+    
+            res.write(JSON.stringify({
+                status: 'Completed',
+                message: `Files uploaded successfully in ${duration} seconds`,
+            }) + '\n');
+            return res.end();
+        } catch (error) {
+            this.logger.error('Error during file upload:', error);
+            res.write(JSON.stringify({ status: 'error', message: 'Error uploading files', error: error.message }) + '\n');
+            return res.end();
+        }
+    }
+
+    @Post('create-preview')
+    @UseGuards(AuthGuard)
+    async createPreview(
+        @Body() body: { objectNames: string[] },
+        @Res() res
+    ) {
+        const { objectNames } = body;
+    
+        if (!objectNames || objectNames.length === 0) {
+            this.logger.error('No object names provided for preview generation');
+            return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No object names provided' });
+        }
+    
+        try {
+            const startTime = Date.now();
+            this.logger.debug(`Start time: ${startTime}`);
+    
+            for (let i = 0; i < objectNames.length; i++) {
+                const objectName = objectNames[i];
+                const sobject: SObject  = await this.db.getObject("l1-raw", objectName);
+    
+                // Upload raw file to MinIO with metadata
+                res.write(JSON.stringify({ status: 'Downloading raw file', file: objectName }) + '\n');
+                const pathToDownloaded = `/tmp/muraxa/downloads/${objectName}`;
+                this.storage.downloadFile("l1-raw", objectName, pathToDownloaded);
+    
+                // Convert video file for preview if preview is true
+                res.write(JSON.stringify({ status: 'Converting 720p', file: objectName }) + '\n');
+                const pathToConverted = `/tmp/muraxa/previews/${objectName}`;
+                await this.video.convertTo720p(pathToDownloaded, pathToConverted);
+    
+                // Upload preview file to MinIO with metadata
+                res.write(JSON.stringify({ status: 'Uploading preview file', file: objectName }) + '\n');
+                const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted);
+
+                // Clean up the converted file
+                fs.unlinkSync(pathToConverted);
+                fs.unlinkSync(pathToDownloaded);
+    
+                if (previewETag) {
+                    await this.db.initObject({
+                        id: objectName,
+                        name: objectName,
+                        created: new Date(),
+                        bucket: 'l1-preview',
+                        preview: false,
+                    });
+
+                    sobject.preview = true;
+                    sobject.save();
+    
+                    await this.lineage.updateObjectLink("l1-raw", objectName, {
+                        serviceName: ServiceName.STORAGE_PREVIEW,
+                        trackingId: previewETag,
+                        references: { objectName },
+                    }, LinkType.TARGET);
+    
+                    await this.lineage.updateObjectLink("l1-preview", objectName, {
+                        serviceName: ServiceName.STORAGE_VERSION,
+                        trackingId: sobject.etag,
+                        references: { objectName },
+                    }, LinkType.SOURCE);
+                }
             }
     
             const endTime = Date.now();

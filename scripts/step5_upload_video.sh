@@ -11,7 +11,7 @@ MINIO_BUCKET="l1-raw"
 CUSTOMER="test2"
 DATE="2024-11-21"
 METADATA='[{"created":"2025-01-23T20:16:52.174Z", "preview":true}]'
-FILE_PATH="test/data/DJI_0429.MP4" # Path to the file to be uploaded
+FILE_PATH="test/data/video13.avi" # Path to the file to be uploaded
 OBJECT_NAME="${CUSTOMER}_$(date -j -f "%Y-%m-%d" "$DATE" "+%y%m%d")/bmp_01p.mp4" # Object name format for macOS
 
 # Function to test the file upload, verify with mc, and call sync-minio-structure

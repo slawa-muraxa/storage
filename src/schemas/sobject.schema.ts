@@ -46,7 +46,7 @@ export class SObject extends Document {
   @Prop({ required: false })
   size: number;
 
-  @Prop({ required: true })
+  @Prop({ required: true, default: new Date() })
   created: Date;
 
   @Prop({ required: false })

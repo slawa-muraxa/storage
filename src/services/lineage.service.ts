@@ -40,7 +40,7 @@ export class LineageService {
   async updateObjectLink(
     bucket: string,
     objectName: string,
-    target: { serviceName: ServiceName; trackingId: string; references: any },
+    link: { serviceName: ServiceName; trackingId: string; references: any },
     linkType: LinkType
   ): Promise<any> {
     try {
@@ -52,14 +52,14 @@ export class LineageService {
 
       if (updatedObject) {
         // Check if the globalId already exists in the metadata.targets array
-        const existingTarget = updatedObject.targets.find(
-          (t: { trackingId: string }) => t.trackingId === target.trackingId
+        const existingLink = updatedObject[linkType]?.find(
+          (l: { trackingId: string }) => l.trackingId === link.trackingId
         );
 
         // If the globalId is the same, do not push a new target
-        if (existingTarget) {
+        if (existingLink) {
           this.logger.warn(
-            `Target with tracking id "${target.trackingId}" already exists for object "${objectName}".`
+            `Target with tracking id "${link.trackingId}" already exists for object "${objectName}".`
           );
           return updatedObject; // Return the existing object without any changes
         }
@@ -68,7 +68,7 @@ export class LineageService {
         const result = await sObjectModel.findOneAndUpdate(
           { id: objectName }, // Query by object ID
           {
-            $push: { [linkType]: target }, // Append the new target to the targets array
+            $push: { [linkType]: link }, // Append the new target to the targets array
           },
           {
             new: true, // Return the updated document
