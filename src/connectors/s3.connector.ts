@@ -23,6 +23,22 @@ export class S3Connector implements StorageConnector {
         @Inject('S3_CLIENT') private readonly s3Client: S3Client,
     ) { }
 
+    async checkAndCreateBuckets(): Promise<void> {
+        const buckets = ['l1-raw', 'l1-preview', 'l2-prep', 'l3-rel', 'l4-dl'];
+
+        for (const bucket of buckets) {
+            try {
+                const headBucketCommand = new HeadBucketCommand({ Bucket: bucket });
+                await this.s3Client.send(headBucketCommand);
+                this.logger.log(`Bucket ${bucket} already exists`);
+            } catch {
+                const createBucketCommand = new CreateBucketCommand({ Bucket: bucket });
+                await this.s3Client.send(createBucketCommand);
+                this.logger.log(`Bucket ${bucket} created`);
+            }
+        }
+    }
+
     async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Buffer> {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 30000); // Abort after 30 seconds
@@ -184,22 +200,6 @@ export class S3Connector implements StorageConnector {
         } catch (err) {
             this.logger.error(`Error uploading ${filePath} to S3 bucket ${bucketName}:`, err);
             throw err;
-        }
-    }
-
-    async checkAndCreateBuckets(): Promise<void> {
-        const buckets = ['l1-raw', 'l1-preview', 'l2-prep', 'l3-rel', 'l4-dl'];
-
-        for (const bucket of buckets) {
-            try {
-                const headBucketCommand = new HeadBucketCommand({ Bucket: bucket });
-                await this.s3Client.send(headBucketCommand);
-                this.logger.log(`Bucket ${bucket} already exists`);
-            } catch {
-                const createBucketCommand = new CreateBucketCommand({ Bucket: bucket });
-                await this.s3Client.send(createBucketCommand);
-                this.logger.log(`Bucket ${bucket} created`);
-            }
         }
     }
 
