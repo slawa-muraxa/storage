@@ -163,9 +163,9 @@ export class StorageController {
     @Post('upload')
     @UseInterceptors(FilesInterceptor('files', 10, {
         storage: diskStorage({
-            destination: './uploads', // Use a local temp folder or directly upload to MinIO
+            destination: './uploads',
             filename: (req, file, callback) => {
-                callback(null, file.originalname); // Generate a filename, or use your own strategy
+                callback(null, file.originalname);
             }
         })
     }))
@@ -176,12 +176,12 @@ export class StorageController {
         @Res() res
     ) {
         const { customer, date, metadata } = body;
-
+    
         if (!files || files.length === 0) {
             this.logger.error('No files provided');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No files provided' });
         }
-
+    
         // Parse metadata from JSON string
         let parsedMetadata: Record<string, any>[] = [];
         try {
@@ -190,71 +190,97 @@ export class StorageController {
             this.logger.error('Invalid metadata format');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'Invalid metadata format', error: error.message });
         }
-
+    
         this.logger.debug('Upload File Request Received');
         res.setHeader('Content-Type', 'application/json');
         res.write(JSON.stringify({ status: 'Processing started' }) + '\n');
-
+    
         if (parsedMetadata.length !== files.length) {
             this.logger.error('Metadata count does not match files count');
             res.write(JSON.stringify({ status: 'error', message: 'Metadata count does not match files count' }) + '\n');
             return res.end();
         }
-
+    
         try {
             const startTime = Date.now();
             this.logger.debug(`Start time: ${startTime}`);
-
+    
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const meta = parsedMetadata[i];
-
+    
                 this.logger.debug(`Uploading to storage: ${file.originalname}`);
-
+    
                 const projectName = `${customer}_${format(new Date(date), 'yyyyMMdd')}`;
                 const objectName = `${projectName}/${file.originalname}`;
                 this.logger.debug(`Generated object name: ${objectName}`);
-
+    
                 // Upload raw file to MinIO with metadata
                 res.write(JSON.stringify({ status: 'Uploading raw file', file: file.originalname }) + '\n');
                 const rawETag = await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
-
-                // Convert video file for preview
-                res.write(JSON.stringify({ status: 'Converting 720p', file: file.originalname }) + '\n');
-                const pathToConverted = `/tmp/muraxa/preview/${objectName}`;
-                await this.video.convertTo720p(file.path, pathToConverted);
-
-                // Upload preview file to MinIO with metadata
-                res.write(JSON.stringify({ status: 'Uploading preview file', file: file.originalname }) + '\n');
-                const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted, meta);
-
+    
+                // Check if preview is enabled in metadata
+                let previewETag = null;
+                if (meta.preview) {
+                    // Convert video file for preview if preview is true
+                    res.write(JSON.stringify({ status: 'Converting 720p', file: file.originalname }) + '\n');
+                    const pathToConverted = `/tmp/muraxa/preview/${objectName}`;
+                    await this.video.convertTo720p(file.path, pathToConverted);
+    
+                    // Upload preview file to MinIO with metadata
+                    res.write(JSON.stringify({ status: 'Uploading preview file', file: file.originalname }) + '\n');
+                    previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted, meta);
+    
+                    // Clean up the converted file
+                    fs.unlinkSync(pathToConverted);
+                }
+    
                 // Extract metadata
                 res.write(JSON.stringify({ status: 'Extracting metadata', file: file.originalname }) + '\n');
                 const metadata = await this.video.extractMetadata(file.path);
-                await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-raw', preview: true });
-                await this.db.initObject({ id: objectName, name: objectName, created: meta.created, bucket: 'l1-preview', preview: false });
-                await this.lineage.updateObjectLink("l1-raw", objectName, {
-                    serviceName: ServiceName.STORAGE_PREVIEW,
-                    trackingId: previewETag,
-                    references: { objectName },
-                }, LinkType.TARGET);
-                await this.lineage.updateObjectLink("l1-preview", objectName, {
-                    serviceName: ServiceName.STORAGE_VERSION,
-                    trackingId: rawETag,
-                    references: { objectName },
-                }, LinkType.SOURCE);
+    
+                // Store metadata and video links in the database
+                await this.db.initObject({
+                    id: objectName,
+                    name: objectName,
+                    created: meta.created,
+                    bucket: 'l1-raw',
+                    preview: meta.preview,
+                });
+    
+                if (meta.preview && previewETag) {
+                    await this.db.initObject({
+                        id: objectName,
+                        name: objectName,
+                        created: meta.created,
+                        bucket: 'l1-preview',
+                        preview: true,
+                    });
+    
+                    await this.lineage.updateObjectLink("l1-raw", objectName, {
+                        serviceName: ServiceName.STORAGE_PREVIEW,
+                        trackingId: previewETag,
+                        references: { objectName },
+                    }, LinkType.TARGET);
+    
+                    await this.lineage.updateObjectLink("l1-preview", objectName, {
+                        serviceName: ServiceName.STORAGE_VERSION,
+                        trackingId: rawETag,
+                        references: { objectName },
+                    }, LinkType.SOURCE);
+                }
+    
                 await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
-
-                // Remove the file after upload
+    
+                // Remove the raw file after upload
                 fs.unlinkSync(file.path);
-                fs.unlinkSync(pathToConverted);
             }
-
+    
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
             this.logger.debug(`End time: ${endTime}`);
             this.logger.debug(`Upload completed in ${duration} seconds`);
-
+    
             res.write(JSON.stringify({
                 status: 'Completed',
                 message: `Files uploaded successfully in ${duration} seconds`,
@@ -266,8 +292,7 @@ export class StorageController {
             return res.end();
         }
     }
-
-
+    
     @Post('cut-selection')
     @UseGuards(AuthGuard)
     async cutSelection(

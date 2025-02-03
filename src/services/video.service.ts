@@ -20,12 +20,13 @@ export class VideoService {
         .output(outputPath)
         .videoCodec("libx264") // Use H.264 codec
         .size("1280x720") // Set resolution to 720p
-        .fps(30) // Set frame rate to 30fps
+        //.fps(30) // Set frame rate to 30fps
         .videoBitrate("3000k") // Set video bitrate to 3 Mbps
         .outputOptions([
+          //"-format mp4",
           "-preset medium", // Balance between speed and compression
-          "-profile:v high", // Use High profile for better compatibility
-          "-pix_fmt yuv420p", // Ensure compatibility with most players
+          //"-profile:v high", // Use High profile for better compatibility
+          //"-pix_fmt yuv420p", // Ensure compatibility with most players
           "-movflags +faststart", // Enable streaming optimization
         ])
         .audioCodec("aac") // Use AAC for audio
