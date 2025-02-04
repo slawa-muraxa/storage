@@ -315,17 +315,17 @@ export class StorageController {
                 const sobject: SObject  = await this.db.getObject("l1-raw", objectName);
     
                 // Upload raw file to MinIO with metadata
-                res.write(JSON.stringify({ status: 'Downloading raw file', file: objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Downloading raw file', objectName }) + '\n');
                 const pathToDownloaded = `/tmp/muraxa/downloads/${objectName}`;
-                this.storage.downloadFile("l1-raw", objectName, pathToDownloaded);
+                await this.storage.downloadFile("l1-raw", objectName, pathToDownloaded);
     
                 // Convert video file for preview if preview is true
-                res.write(JSON.stringify({ status: 'Converting 720p', file: objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Converting 720p', objectName }) + '\n');
                 const pathToConverted = `/tmp/muraxa/previews/${objectName}`;
                 await this.video.convertTo720p(pathToDownloaded, pathToConverted);
     
                 // Upload preview file to MinIO with metadata
-                res.write(JSON.stringify({ status: 'Uploading preview file', file: objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Uploading preview file', objectName }) + '\n');
                 const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted);
 
                 // Clean up the converted file
@@ -356,6 +356,8 @@ export class StorageController {
                         references: { objectName },
                     }, LinkType.SOURCE);
                 }
+
+                res.write(JSON.stringify({ status: 'Preview uploaded', objectName }) + '\n');
             }
     
             const endTime = Date.now();
