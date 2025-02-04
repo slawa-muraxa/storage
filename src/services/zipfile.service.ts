@@ -36,7 +36,6 @@ export class ZipFileProcessorService {
                 // Read and parse the content of default.json
                 const jsonContent = await this.readJsonFile(filePath);
                 // Store or process the parsed JSON as needed
-                this.logger.log('Parsed default.json:', jsonContent);
                 file.content = jsonContent;
 
             } 

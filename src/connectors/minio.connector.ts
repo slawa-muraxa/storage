@@ -136,6 +136,10 @@ export class MinioConnector implements StorageConnector {
         }
     }
 
+    putTextObject(key: string, body: string, bucket: string): Promise<any> {
+        throw new Error('Method not implemented.');
+    }
+
     async testMinioConnection(): Promise<void> {
         try {
             const buckets = await this.minioClient.listBuckets();

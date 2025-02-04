@@ -38,7 +38,7 @@ export class IngestService {
     const previewStoragePath = `${projectName}/${dstPath}/preview/default`;
 
     try {
-      this.logger.log(`Starting ingestion for task ${dstPath}`);
+      this.logger.debug(`Starting ingestion for task ${dstPath}`);
 
       const framePublisher: FramePublisher = new FramePublisher(objectName, this.kafka)
 
@@ -56,7 +56,7 @@ export class IngestService {
 
       this.lineage.updateObjectLink("l1-raw", objectName, {serviceName: ServiceName.STORAGE_LAKE, trackingId: dstPath, references: {targetPath: storagePath}}, LinkType.TARGET);
 
-      this.logger.log(`Completed ingestion for task ${dstPath}`);
+      this.logger.debug(`Completed ingestion for task ${dstPath}`);
     } catch (error) {
       this.logger.error(`Error during ingestion for task ${dstPath}`, error);
     }

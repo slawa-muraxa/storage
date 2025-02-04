@@ -19,6 +19,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory, grpcAuthOptionsFactory, s3ClientFactory } from './storage.config';
 import { AuthGuard } from './auth/auth.guard.rpc';
 import { S3Connector } from './connectors/s3.connector';
+import { InboundController } from './controllers/inbound.controller';
 
 @Module({
   imports: [
@@ -62,7 +63,7 @@ import { S3Connector } from './connectors/s3.connector';
       },
     ]),
   ],
-  controllers: [StorageController, MetaController, TagController],
+  controllers: [StorageController, MetaController, TagController, InboundController],
   providers: [
     ZipFileProcessorService,
     KafkaConnector,

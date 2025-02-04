@@ -24,7 +24,7 @@ export class S3Connector implements StorageConnector {
     ) { }
 
     async checkAndCreateBuckets(): Promise<void> {
-        const buckets = ['l1-raw', 'l1-preview', 'l2-prep', 'l3-rel', 'l4-dl'];
+        const buckets = ['l1-raw', 'l1-preview', 'l2-prep', 'l2-proc', 'l3-rel', 'l4-dl'];
 
         for (const bucket of buckets) {
             try {
@@ -101,6 +101,24 @@ export class S3Connector implements StorageConnector {
                 err
             );
             throw err;
+        }
+    }
+
+    async putTextObject(key: string, body: string, bucket: string ): Promise<any> {
+        try {
+            const command = new PutObjectCommand({
+                Bucket: bucket,
+                Key: key,
+                Body: body,
+                ContentType: 'text/plain',
+                Metadata: { createdAt: new Date().toISOString() },
+            });
+
+            const response = await this.s3Client.send(command);
+
+            return response;
+        } catch (err) {
+            this.logger.error("Failed creating text object: ", err)
         }
     }
 

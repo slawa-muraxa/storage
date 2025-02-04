@@ -3,7 +3,8 @@ import { Readable } from "stream";
 export interface StorageConnector {
     downloadFile(bucketName: string, objectName: string, filePath: string): Promise<string>;
     getObject(bucketName: string, objectName: string): Promise<Readable>;
-    putObject(bucketName: string, targetFilePath: string, fullPath: string, metadata?: Record<string, any>): Promise<any> 
+    putObject(bucketName: string, targetFilePath: string, fullPath: string, metadata?: Record<string, any>): Promise<any>;
+    putTextObject(key: string, body: string, bucket: string ): Promise<any>;
     uploadFile(bucketName: string, objectName: string, filePath: string, metadata?: Record<string, any>): Promise<string>;
     checkAndCreateBuckets(): Promise<void>;
     listAllObjects(bucketName: string, path: string): Promise<any[]>;
