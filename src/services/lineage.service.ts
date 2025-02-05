@@ -4,7 +4,7 @@ import { SObject, SObjectSchema, ServiceName } from '../schemas/sobject.schema';
 import { InjectConnection } from '@nestjs/mongoose';
 
 const ServiceDetails: Record<ServiceName, { bucket: string }> = {
-  [ServiceName.CVAT]: { bucket: undefined },
+  [ServiceName.ENOT]: { bucket: undefined },
   [ServiceName.STORAGE_PREVIEW]: { bucket: 'l1-preview' },
   [ServiceName.STORAGE_VERSION]: { bucket: 'l1-raw' },
   [ServiceName.STORAGE_LAKE]: { bucket: "l4-dl" }

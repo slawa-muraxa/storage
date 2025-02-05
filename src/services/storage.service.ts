@@ -43,7 +43,7 @@ export class StorageService {
   async initObject(object: any) {
     const sObjectModel = this.getModelForBucket(object.bucket);
 
-    await sObjectModel.updateOne(
+    return await sObjectModel.updateOne(
       { id: object.name }, // Use a unique identifier for the object
       { $set: object }, // Include bucket info for tracking
       { new: true, upsert: true } // Create the object if it doesn't exist
@@ -63,6 +63,15 @@ export class StorageService {
 
     return await sObjectModel.updateMany(
       { active: false }
+    );
+  }
+
+  async activateObject(bucket: string, objectName: string, active: boolean): Promise<any> {
+    const sObjectModel = this.getModelForBucket(bucket);
+
+    return await sObjectModel.updateOne(
+      { id: objectName },
+      { active }
     );
   }
 

@@ -3,7 +3,7 @@ import { Document, Schema as MongooseSchema } from "mongoose";
 
 // Define enum before usage
 export enum ServiceName {
-  CVAT = "CVAT",
+  ENOT = "ENOT",
   STORAGE_PREVIEW = "STORAGE_PREVIEW",
   STORAGE_VERSION = "STORAGE_VERSION",
   STORAGE_LAKE = "STORAGE_LAKE",
