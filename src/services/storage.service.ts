@@ -168,7 +168,7 @@ export class StorageService {
   async updateAttributes(
     bucket: string,
     objectName: string,
-    attributes: string[]
+    attributes: any[]
   ): Promise<any> {
     try {
       const sObjectModel = this.getModelForBucket(bucket);

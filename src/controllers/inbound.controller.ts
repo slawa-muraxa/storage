@@ -56,9 +56,15 @@ export class InboundController {
         }, LinkType.SOURCE);
       }
 
-      const metadata:any = {};
-      metadata.labels = task.labels;
-      metadata.attributes = [{name: "frames", value: task.size}, {name: "owner", value: task?.owner?.username},];
+      const tags = task.labels.map(label => ({name: label.name, color: label.color}));
+      const attributes = [
+        { name: "frames", value: task.size }, 
+        { name: "owner", value: task?.owner?.username },
+        { name: "project", value: task.projectName },
+      ];
+
+      await this.storageService.tagObject("l2-proc", taskObjectName, tags);
+      await this.storageService.updateAttributes("l2-proc", taskObjectName, attributes);
 
     } else {
 

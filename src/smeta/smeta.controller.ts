@@ -96,7 +96,7 @@ export class MetaController {
     @Post('update-attributes')
     @UseGuards(AuthGuard)
     async updateAttributes(
-        @Body() body: { objectName: string; attributes: string[]; bucket: string },
+        @Body() body: { objectName: string; attributes: any[]; bucket: string },
         @Res() res: Response
     ) {
         const { objectName, attributes, bucket } = body;
