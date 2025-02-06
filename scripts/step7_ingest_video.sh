@@ -13,6 +13,7 @@ TIMEOUT=30
 INTERVAL=2
 TOPIC="frame-update"
 BROKER="localhost:9092" # Adjust broker address if needed
+OBJECTS='{"objectNames": ["test/bmp_13m.mp4", "test/bmp_13o.mp4"]}' 
 
 # Expected Output for Comparison
 EXPECTED_JSON='{
@@ -50,7 +51,7 @@ EXPECTED_JSON='{
       "bitRate": 91321,
       "codec": "h264",
       "fps": 26.510130657072523,
-      "numberOfFrames": 14,
+      "numberOfFrames": 14,10.1000
       "width": 904,
       "height": 720,
       "quality": {
@@ -78,7 +79,7 @@ mongosh --quiet --host localhost:37017 --eval '
 echo "Testing /ingest-video endpoint..."
 RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$API_URL" \
   -H "Content-Type: application/json" \
-  -d "{\"objectName\":\"$OBJECT_NAME\", \"projectName\":\"$PROJECT_NAME\"}")
+  --data-raw "$OBJECTS" )
 
 # Parse Response
 HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS" | awk -F: '{print $2}')

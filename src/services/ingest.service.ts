@@ -18,7 +18,7 @@ export class IngestService {
     private readonly lineage: LineageService,
     @Inject('StorageConnector') private readonly storage: StorageConnector,
     private readonly kafka: KafkaConnector
-  ) {}
+  ) { }
 
   /**
    * Initializes the ingestion process for a given task.
@@ -27,38 +27,64 @@ export class IngestService {
    */
   async videoToDatalake(
     objectName: string,
-    projectName: string,
-    sourcePath: string
+    sourcePath: string,
+    logger: (message: string) => void
   ): Promise<void> {
-    const dstPath = `${path.basename(objectName)}`;
-    const tmpDir = path.join(__dirname, "tmp");
-    const tmpImages = path.join(tmpDir, dstPath);
-    const tmpPreviewImages = path.join(tmpDir, dstPath + "-preview");
-    const storagePath = `${projectName}/${dstPath}/images/default`;
-    const previewStoragePath = `${projectName}/${dstPath}/preview/default`;
+    const objectBasename = `${path.basename(objectName)}`;
+    const tmpDir = path.join("tmp/muraxa/frames", objectName);
+    const tmpImages = path.join(tmpDir, "raw");
+    const tmpPreviewImages = path.join(tmpDir, "preview");
+    const storagePath = `${objectName}/images/default`;
+    const previewStoragePath = `${objectName}/images/preview`;
+    const frameObjectLinkPath = `${objectName}/${objectBasename}.link`;
 
     try {
-      this.logger.debug(`Starting ingestion for task ${dstPath}`);
+      this.logger.debug(`Starting ingestion for: ${objectName}`);
 
       const framePublisher: FramePublisher = new FramePublisher(objectName, this.kafka)
 
       // Fragment video and store frames in temporary directory
+      logger("Creating raw frames ...");
       await this.videoService.videoFragmentation(sourcePath, tmpImages, "lossless", framePublisher);
+      logger("Uploading raw frames ...");
       await this.ingestImages(tmpImages, storagePath, "l4-dl", framePublisher);
       await this.videoService.cleanupDirectory(tmpImages);
 
       // Fragment video and store frames in temporary directory
+      logger("Creating preview frames ...");
       await this.videoService.videoFragmentation(sourcePath, tmpPreviewImages, "preview", null);
+      logger("Uploading preview frames ...");
       await this.ingestImages(tmpPreviewImages, previewStoragePath, "l4-dl", null);
       await this.videoService.cleanupDirectory(tmpPreviewImages);
 
+      // Establishing lineage
+      const dlObject = await this.storage.putTextObject(frameObjectLinkPath, `${objectName}`, 'l4-dl');
+      const dlDbObject = {
+        id: frameObjectLinkPath,
+        bucket: "l4-dl",
+        name: frameObjectLinkPath,
+        etag: dlObject.ETag,
+        size: dlObject.Size,
+        active: true,
+      }
+      await this.storageService.initObject(dlDbObject);
+      const sourceObject = await this.storageService.getObject("l1-raw", objectName);
+      await this.lineage.updateObjectLink("l1-raw", objectName, {
+        serviceName: ServiceName.STORAGE_LAKE,
+        trackingId: dlObject.ETag,
+        references: { objectName: frameObjectLinkPath },
+      }, LinkType.TARGET);
+      await this.lineage.updateObjectLink("l4-dl", frameObjectLinkPath, {
+        serviceName: ServiceName.STORAGE_VERSION,
+        trackingId: sourceObject.etag,
+        references: { objectName },
+      }, LinkType.SOURCE);
+
       framePublisher.publishFrameMeta();
 
-      this.lineage.updateObjectLink("l1-raw", objectName, {serviceName: ServiceName.STORAGE_LAKE, trackingId: dstPath, references: {targetPath: storagePath}}, LinkType.TARGET);
-
-      this.logger.debug(`Completed ingestion for task ${dstPath}`);
+      this.logger.debug(`Completed ingestion for task ${objectName}`);
     } catch (error) {
-      this.logger.error(`Error during ingestion for task ${dstPath}`, error);
+      this.logger.error(`Error during ingestion for task ${objectName}`, error);
     }
   }
 
@@ -77,15 +103,15 @@ export class IngestService {
     const uploadFiles = async (dir: string, targetDir: string) => {
       const files = fs.readdirSync(dir);
       let fileCount = 0;
-    
+
       for (const file of files) {
         const fullPath = path.join(dir, file);
         const targetFilePath = path.join(targetDir, file);
         const fileName = path.basename(file, path.extname(file));
-    
+
         if (!fs.lstatSync(fullPath).isDirectory()) {
           // Upload file to MinIO
-          const info = await this.storage.putObject(bucketName,targetFilePath,fullPath);
+          const info = await this.storage.putObject(bucketName, targetFilePath, fullPath);
           framePublisher?.recordFrameMetadata(fileCount++, fileName, targetFilePath, info.etag, bucketName);
         }
       }
@@ -104,7 +130,7 @@ export class IngestService {
 export class FramePublisher {
 
   private sourceVideo: string;
-  private kafka: KafkaConnector; 
+  private kafka: KafkaConnector;
   private width: number;
   private height: number;
 
@@ -112,15 +138,15 @@ export class FramePublisher {
 
   constructor(sourceVideo: string, kafka: KafkaConnector) {
     this.sourceVideo = sourceVideo;
-    this.kafka = kafka; 
+    this.kafka = kafka;
   }
 
   public async recordFrameMetadata(
     frameNumber: number,
     frameName: string,
     frameSource: string,
-    etag:string, 
-    bucket:string
+    etag: string,
+    bucket: string
   ) {
     try {
       // Create the frame object

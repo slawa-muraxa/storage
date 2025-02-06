@@ -30,7 +30,7 @@ export class StorageController {
     async syncMinioStructure(@Req() req, @Res() res) {
         try {
             console.log('Start syncing MinIO buckets');
-            const buckets = [ "l1-raw", "l1-preview", "l2-prep", "l3-rel"];
+            const buckets = ["l1-raw", "l1-preview", "l2-prep", "l3-rel"];
             const newBucketData = await Promise.all(buckets.map(async (bucket) => {
                 await this.db.deactivateObjects(bucket);
                 const objects = await this.storage.listAllObjects(bucket, '');
@@ -71,7 +71,7 @@ export class StorageController {
             this.logger.debug(`Received request to stream file: ${fileName}`);
 
             const sObject = await this.db.getObject('l1-raw', fileName);
-            const previewBucket = sObject?.preview ? "l1-preview" : "l1-raw"; 
+            const previewBucket = sObject?.preview ? "l1-preview" : "l1-raw";
 
             // Get file stats
             const fileStats = await this.storage.getObjectStats(previewBucket, fileName);
@@ -176,12 +176,12 @@ export class StorageController {
         @Res() res
     ) {
         const { customer, date, metadata } = body;
-    
+
         if (!files || files.length === 0) {
             this.logger.error('No files provided');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No files provided' });
         }
-    
+
         // Parse metadata from JSON string
         let parsedMetadata: Record<string, any>[] = [];
         try {
@@ -190,35 +190,35 @@ export class StorageController {
             this.logger.error('Invalid metadata format');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'Invalid metadata format', error: error.message });
         }
-    
+
         this.logger.debug('Upload File Request Received');
         res.setHeader('Content-Type', 'application/json');
         res.write(JSON.stringify({ status: 'Processing started' }) + '\n');
-    
+
         if (parsedMetadata.length !== files.length) {
             this.logger.error('Metadata count does not match files count');
             res.write(JSON.stringify({ status: 'error', message: 'Metadata count does not match files count' }) + '\n');
             return res.end();
         }
-    
+
         try {
             const startTime = Date.now();
             this.logger.debug(`Start time: ${startTime}`);
-    
+
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const meta = parsedMetadata[i];
-    
+
                 this.logger.debug(`Uploading to storage: ${file.originalname}`);
-    
+
                 const projectName = `${customer}_${format(new Date(date), 'yyyyMMdd')}`;
                 const objectName = `${projectName}/${file.originalname}`;
                 this.logger.debug(`Generated object name: ${objectName}`);
-    
+
                 // Upload raw file to MinIO with metadata
                 res.write(JSON.stringify({ status: 'Uploading raw file', file: file.originalname }) + '\n');
                 const rawETag = await this.storage.uploadFile('l1-raw', objectName, file.path, meta);
-    
+
                 // Check if preview is enabled in metadata
                 let previewETag = null;
                 if (meta.preview) {
@@ -226,19 +226,19 @@ export class StorageController {
                     res.write(JSON.stringify({ status: 'Converting 720p', file: file.originalname }) + '\n');
                     const pathToConverted = `/tmp/muraxa/preview/${objectName}`;
                     await this.video.convertTo720p(file.path, pathToConverted);
-    
+
                     // Upload preview file to MinIO with metadata
                     res.write(JSON.stringify({ status: 'Uploading preview file', file: file.originalname }) + '\n');
                     previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted, meta);
-    
+
                     // Clean up the converted file
                     fs.unlinkSync(pathToConverted);
                 }
-    
+
                 // Extract metadata
                 res.write(JSON.stringify({ status: 'Extracting metadata', file: file.originalname }) + '\n');
                 const metadata = await this.video.extractMetadata(file.path);
-    
+
                 // Store metadata and video links in the database
                 await this.db.initObject({
                     id: objectName,
@@ -247,7 +247,7 @@ export class StorageController {
                     bucket: 'l1-raw',
                     preview: meta.preview,
                 });
-    
+
                 if (meta.preview && previewETag) {
                     await this.db.initObject({
                         id: objectName,
@@ -256,31 +256,31 @@ export class StorageController {
                         bucket: 'l1-preview',
                         preview: true,
                     });
-    
+
                     await this.lineage.updateObjectLink("l1-raw", objectName, {
                         serviceName: ServiceName.STORAGE_PREVIEW,
                         trackingId: previewETag,
                         references: { objectName },
                     }, LinkType.TARGET);
-    
+
                     await this.lineage.updateObjectLink("l1-preview", objectName, {
                         serviceName: ServiceName.STORAGE_VERSION,
                         trackingId: rawETag,
                         references: { objectName },
                     }, LinkType.SOURCE);
                 }
-    
+
                 await this.db.storeVideoMetadata('l1-raw', objectName, metadata);
-    
+
                 // Remove the raw file after upload
                 fs.unlinkSync(file.path);
             }
-    
+
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
             this.logger.debug(`End time: ${endTime}`);
             this.logger.debug(`Upload completed in ${duration} seconds`);
-    
+
             res.write(JSON.stringify({
                 status: 'Completed',
                 message: `Files uploaded successfully in ${duration} seconds`,
@@ -300,30 +300,30 @@ export class StorageController {
         @Res() res
     ) {
         const { objectNames } = body;
-    
+
         if (!objectNames || objectNames.length === 0) {
             this.logger.error('No object names provided for preview generation');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No object names provided' });
         }
-    
+
         try {
             const startTime = Date.now();
             this.logger.debug(`Start time: ${startTime}`);
-    
+
             for (let i = 0; i < objectNames.length; i++) {
                 const objectName = objectNames[i];
-                const sobject: SObject  = await this.db.getObject("l1-raw", objectName);
-    
+                const sobject: SObject = await this.db.getObject("l1-raw", objectName);
+
                 // Upload raw file to MinIO with metadata
                 res.write(JSON.stringify({ status: 'Downloading raw file', objectName }) + '\n');
                 const pathToDownloaded = `/tmp/muraxa/downloads/${objectName}`;
                 await this.storage.downloadFile("l1-raw", objectName, pathToDownloaded);
-    
+
                 // Convert video file for preview if preview is true
                 res.write(JSON.stringify({ status: 'Converting 720p', objectName }) + '\n');
                 const pathToConverted = `/tmp/muraxa/previews/${objectName}`;
                 await this.video.convertTo720p(pathToDownloaded, pathToConverted);
-    
+
                 // Upload preview file to MinIO with metadata
                 res.write(JSON.stringify({ status: 'Uploading preview file', objectName }) + '\n');
                 const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted);
@@ -331,7 +331,7 @@ export class StorageController {
                 // Clean up the converted file
                 fs.unlinkSync(pathToConverted);
                 fs.unlinkSync(pathToDownloaded);
-    
+
                 if (previewETag) {
                     await this.db.initObject({
                         id: objectName,
@@ -343,13 +343,13 @@ export class StorageController {
 
                     sobject.preview = true;
                     sobject.save();
-    
+
                     await this.lineage.updateObjectLink("l1-raw", objectName, {
                         serviceName: ServiceName.STORAGE_PREVIEW,
                         trackingId: previewETag,
                         references: { objectName },
                     }, LinkType.TARGET);
-    
+
                     await this.lineage.updateObjectLink("l1-preview", objectName, {
                         serviceName: ServiceName.STORAGE_VERSION,
                         trackingId: sobject.etag,
@@ -359,12 +359,12 @@ export class StorageController {
 
                 res.write(JSON.stringify({ status: 'Preview uploaded', objectName }) + '\n');
             }
-    
+
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
             this.logger.debug(`End time: ${endTime}`);
             this.logger.debug(`Upload completed in ${duration} seconds`);
-    
+
             res.write(JSON.stringify({
                 status: 'Completed',
                 message: `Files uploaded successfully in ${duration} seconds`,
@@ -376,7 +376,7 @@ export class StorageController {
             return res.end();
         }
     }
-    
+
     @Post('cut-selection')
     @UseGuards(AuthGuard)
     async cutSelection(
@@ -465,54 +465,55 @@ export class StorageController {
     @Post('ingest-video')
     @UseGuards(AuthGuard)
     async ingestVideo(
-        @Body() body: { objectName: string; projectName: string },
+        @Body() body: { objectNames: string[] },
         @Res() res
     ) {
-        const { objectName, projectName } = body;
+        const { objectNames } = body;
 
-        if (!objectName || !projectName) {
-            this.logger.error('Missing required parameters: objectName or projectName');
-            return res
-                .status(HttpStatus.BAD_REQUEST)
-                .json({ message: 'objectName and projectName are required.' });
+        if (!objectNames || objectNames.length === 0) {
+            this.logger.error('No object names provided for preview generation');
+            return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No object names provided' });
         }
 
-        const sourcePath = path.join('./downloads', objectName);
-
         try {
-            this.logger.log(`Starting ingestion for object: ${objectName}, project: ${projectName}`);
 
-            // Step 1: Download file from MinIO
-            this.logger.debug('Downloading file from MinIO...');
-            await this.storage.downloadFile('l1-raw', objectName, sourcePath);
-            this.logger.debug('File downloaded successfully.');
+            for (let index = 0; index < objectNames.length; index++) {
+                const objectName = objectNames[index];
+                const sourcePath = path.join('/tmp/muraxa/downloads', objectName);
+                this.logger.log(`Starting ingestion for object: ${objectName}`);
 
-            // Step 2: Initialize task ingestion
-            this.logger.debug('Initializing task ingestion...');
-            await this.ingest.videoToDatalake(objectName, projectName, sourcePath);
-            this.logger.log('Task ingestion completed successfully.');
+                // Step 1: Download file from MinIO
+                res.write(JSON.stringify({ status: 'Downloading raw file ...', objectName }) + '\n');
+                this.logger.debug('Downloading file from MinIO...');
+                await this.storage.downloadFile('l1-raw', objectName, sourcePath);
+                this.logger.debug('File downloaded successfully.');
+
+                // Step 2: Initialize task ingestion
+                res.write(JSON.stringify({ status: 'Downloading raw file ...', objectName }) + '\n');
+                this.logger.debug('Initializing task ingestion...');
+                const resLogger = (message: string) => {
+                    res.write(JSON.stringify({ status: message, objectName }) + '\n');
+                }
+                await this.ingest.videoToDatalake(objectName, sourcePath, resLogger);
+                this.logger.log('Task ingestion completed successfully.');
+                res.write(JSON.stringify({ status: 'Ingestion completed', objectName }) + '\n');
+
+                await this.video.deleteFile(sourcePath);
+            }
 
             // Step 3: Send success response
-            return res
-                .status(HttpStatus.OK)
-                .json({ message: 'Success processing task' });
+            res.write(JSON.stringify({
+                status: 'Completed',
+            }) + '\n');
+            return res.end();
+
         } catch (error) {
             this.logger.error('Error processing task:', error);
             return res
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .json({ message: 'Error processing task', error: error.message });
-        } finally {
-            // Step 4: Cleanup temporary files
-            try {
-                this.logger.debug('Cleaning up temporary files...');
-                await this.video.deleteFile(sourcePath);
-                this.logger.debug('Temporary files cleaned up.');
-            } catch (cleanupError) {
-                this.logger.warn('Error during cleanup:', cleanupError);
-            }
         }
     }
-
 
     private groupByBucket(data) {
         return data.reduce((acc, obj) => {
