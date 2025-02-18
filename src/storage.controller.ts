@@ -315,17 +315,17 @@ export class StorageController {
                 const sobject: SObject = await this.db.getObject("l1-raw", objectName);
 
                 // Upload raw file to MinIO with metadata
-                res.write(JSON.stringify({ status: 'Downloading raw file', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Downloading raw file', progress: 25, objectName }) + '\n');
                 const pathToDownloaded = `/tmp/muraxa/downloads/${objectName}`;
                 await this.storage.downloadFile("l1-raw", objectName, pathToDownloaded);
 
                 // Convert video file for preview if preview is true
-                res.write(JSON.stringify({ status: 'Converting 720p', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Converting 720p', progress: 50, objectName }) + '\n');
                 const pathToConverted = `/tmp/muraxa/previews/${objectName}`;
                 await this.video.convertTo720p(pathToDownloaded, pathToConverted);
 
                 // Upload preview file to MinIO with metadata
-                res.write(JSON.stringify({ status: 'Uploading preview file', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Uploading preview file', progress: 75, objectName }) + '\n');
                 const previewETag = await this.storage.uploadFile('l1-preview', objectName, pathToConverted);
 
                 // Clean up the converted file
@@ -357,7 +357,7 @@ export class StorageController {
                     }, LinkType.SOURCE);
                 }
 
-                res.write(JSON.stringify({ status: 'Preview uploaded', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Preview uploaded', progress: 100, objectName }) + '\n');
             }
 
             const endTime = Date.now();
@@ -483,20 +483,20 @@ export class StorageController {
                 this.logger.log(`Starting ingestion for object: ${objectName}`);
 
                 // Step 1: Download file from MinIO
-                res.write(JSON.stringify({ status: 'Downloading raw file ...', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Downloading raw file ...', progress: 25, objectName }) + '\n');
                 this.logger.debug('Downloading file from MinIO...');
                 await this.storage.downloadFile('l1-raw', objectName, sourcePath);
                 this.logger.debug('File downloaded successfully.');
 
                 // Step 2: Initialize task ingestion
-                res.write(JSON.stringify({ status: 'Downloading raw file ...', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Downloading raw file ...', progress: 50, objectName }) + '\n');
                 this.logger.debug('Initializing task ingestion...');
-                const resLogger = (message: string) => {
-                    res.write(JSON.stringify({ status: message, objectName }) + '\n');
+                const resLogger = (message: string, progress: number) => {
+                    res.write(JSON.stringify({ status: message, progress, objectName }) + '\n');
                 }
                 await this.ingest.videoToDatalake(objectName, sourcePath, resLogger);
                 this.logger.log('Task ingestion completed successfully.');
-                res.write(JSON.stringify({ status: 'Ingestion completed', objectName }) + '\n');
+                res.write(JSON.stringify({ status: 'Ingestion completed', progress: 100, objectName }) + '\n');
 
                 await this.video.deleteFile(sourcePath);
             }

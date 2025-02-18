@@ -28,7 +28,7 @@ export class IngestService {
   async videoToDatalake(
     objectName: string,
     sourcePath: string,
-    logger: (message: string) => void
+    logger: (message: string, progress: number) => void
   ): Promise<void> {
     const objectBasename = `${path.basename(objectName)}`;
     const tmpDir = path.join("tmp/muraxa/frames", objectName);
@@ -44,16 +44,16 @@ export class IngestService {
       const framePublisher: FramePublisher = new FramePublisher(objectName, this.kafka)
 
       // Fragment video and store frames in temporary directory
-      logger("Creating raw frames ...");
+      logger("Creating raw frames ...", 60);
       await this.videoService.videoFragmentation(sourcePath, tmpImages, "lossless", framePublisher);
-      logger("Uploading raw frames ...");
+      logger("Uploading raw frames ...", 70);
       await this.ingestImages(tmpImages, storagePath, "l4-dl", framePublisher);
       await this.videoService.cleanupDirectory(tmpImages);
 
       // Fragment video and store frames in temporary directory
-      logger("Creating preview frames ...");
+      logger("Creating preview frames ...", 80);
       await this.videoService.videoFragmentation(sourcePath, tmpPreviewImages, "preview", null);
-      logger("Uploading preview frames ...");
+      logger("Uploading preview frames ...", 90);
       await this.ingestImages(tmpPreviewImages, previewStoragePath, "l4-dl", null);
       await this.videoService.cleanupDirectory(tmpPreviewImages);
 
