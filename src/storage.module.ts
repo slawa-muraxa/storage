@@ -20,6 +20,8 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
 import { AuthGuard } from './auth/auth.guard.rpc';
 import { S3Connector } from './connectors/s3.connector';
 import { InboundController } from './controllers/inbound.controller';
+import { ImageService } from './services/image.service';
+import { IngestController } from './controllers/ingest.controller';
 
 @Module({
   imports: [
@@ -63,13 +65,14 @@ import { InboundController } from './controllers/inbound.controller';
       },
     ]),
   ],
-  controllers: [StorageController, MetaController, TagController, InboundController],
+  controllers: [StorageController, MetaController, TagController, InboundController, IngestController],
   providers: [
     ZipFileProcessorService,
     KafkaConnector,
     LineageService,
     StorageService,
     VideoService,
+    ImageService,
     IngestService,
     TagService,
     AuthGuard,

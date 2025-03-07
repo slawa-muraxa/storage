@@ -182,14 +182,8 @@ export class VideoService {
     videoFile: string,
     outputDir: string,
     outputType: "lossless" | "preview",
-    publisher: FramePublisher
   ): Promise<string> {
     const metadata = await this.extractMetadata(videoFile);
-
-    publisher?.recordVideoMeta(
-      metadata.width,
-      metadata.height
-    );
 
     const absolutePath = path.resolve(videoFile);
 

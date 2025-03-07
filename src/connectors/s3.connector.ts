@@ -91,9 +91,8 @@ export class S3Connector implements StorageConnector {
             // Send the command to S3
             const response = await this.s3Client.send(command);
 
-            // Log success and return the ETag as confirmation
-            //this.logger.log(`Successfully uploaded object to ${bucketName}/${targetFilePath}`);
-            return response.ETag || '';
+            // Return the cleaned ETag (removing double quotes)
+            return response.ETag ? response.ETag.replace(/"/g, '') : '';
         } catch (err) {
             // Log and re-throw errors for handling upstream
             this.logger.error(
@@ -104,7 +103,7 @@ export class S3Connector implements StorageConnector {
         }
     }
 
-    async putTextObject(key: string, body: string, bucket: string ): Promise<any> {
+    async putTextObject(key: string, body: string, bucket: string): Promise<any> {
         try {
             const command = new PutObjectCommand({
                 Bucket: bucket,

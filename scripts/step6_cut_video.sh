@@ -72,41 +72,41 @@ object_count=$(echo "$fetch_response_body" | jq '.["l1-raw"] | length')
 preview_count=$(echo "$fetch_response_body" | jq '.["l1-preview"] | length')
 
 # Validate the proper amount of target
-targets_count=$(echo "$fetch_response_body" | jq '[.["l1-raw"][], .["l1-preview"][] | select(.targets | length == 1)] | length')
+targets_count=$(echo "$fetch_response_body" | jq '[.["l1-raw"][], .["l1-preview"][] | .targets | length] | add')
 
 # Validate the proper amount of target
-sources_count=$(echo "$fetch_response_body" | jq '[.["l1-raw"][], .["l1-preview"][] | select(.sources | length == 1)] | length')
+sources_count=$(echo "$fetch_response_body" | jq '[.["l1-raw"][], .["l1-preview"][] | .sources | length] | add')
 
 # Validate the number of targets in the response
-if [[ $fetch_status_code -eq 200 && $targets_count -eq 2 ]]; then
-    echo "sync-minio-structure successful. 2 targets found."
+if [[ $fetch_status_code -eq 200 && $targets_count -eq 4 ]]; then
+    echo "sync-minio-structure successful. 4 targets found."
 else
-    echo "Error: updated targets mismatch"
+    echo "Error: updated targets mismatch $targets_count" 
     exit 1
 fi
 
 # Validate the number of sources in the response
-if [[ $fetch_status_code -eq 200 && $sources_count -eq 1 ]]; then
-    echo "sync-minio-structure successful. 1 source found."
+if [[ $fetch_status_code -eq 200 && $sources_count -eq 4 ]]; then
+    echo "sync-minio-structure successful. 4 source found."
 else
-    echo "Error: updated sources mismatch"
+    echo "Error: updated sources mismatch $sources_count"
     exit 1
 fi
 
 # Validate the number of objects in the response
-if [[ $fetch_status_code -eq 200 && $object_count -eq 5 ]]; then
-    echo "sync-minio-structure successful. 4 raw objects found."
+if [[ $fetch_status_code -eq 200 && $object_count -eq 6 ]]; then
+    echo "sync-minio-structure successful. 6 raw objects found."
 else
-    echo "Error: raw objects mismatch"
+    echo "Error: raw objects mismatch $object_count"
     exit 1
 fi
 
 # Validate the number of objects in the response
-if [[ $fetch_status_code -eq 200 && $preview_count -eq 1 ]]; then
-    echo "sync-minio-structure successful. 1 preview object found."
+if [[ $fetch_status_code -eq 200 && $preview_count -eq 3 ]]; then
+    echo "sync-minio-structure successful. 3 preview object found."
 else
-    echo "Error: preview objects mismatch"
+    echo "Error: preview objects mismatch $preview_count"
     exit 1
 fi
 
-echo "Success: Processed file size is smaller than the original file size."
+echo "Success"
