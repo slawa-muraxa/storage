@@ -22,6 +22,7 @@ import { S3Connector } from './connectors/s3.connector';
 import { InboundController } from './controllers/inbound.controller';
 import { ImageService } from './services/image.service';
 import { IngestController } from './controllers/ingest.controller';
+import { UploadController } from './controllers/upload.controller';
 
 @Module({
   imports: [
@@ -65,7 +66,7 @@ import { IngestController } from './controllers/ingest.controller';
       },
     ]),
   ],
-  controllers: [StorageController, MetaController, TagController, InboundController, IngestController],
+  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController],
   providers: [
     ZipFileProcessorService,
     KafkaConnector,

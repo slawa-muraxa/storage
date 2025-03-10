@@ -7,6 +7,7 @@ export enum ServiceName {
   STORAGE_PREVIEW = "STORAGE_PREVIEW",
   STORAGE_VERSION = "STORAGE_VERSION",
   STORAGE_LAKE = "STORAGE_LAKE",
+  STORAGE_DATASET = "STORAGE_DATASET",
 }
 
 export function mapServiceName(value: string): ServiceName | undefined {

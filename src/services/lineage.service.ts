@@ -7,7 +7,8 @@ const ServiceDetails: Record<ServiceName, { bucket: string }> = {
   [ServiceName.ENOT]: { bucket: undefined },
   [ServiceName.STORAGE_PREVIEW]: { bucket: 'l1-preview' },
   [ServiceName.STORAGE_VERSION]: { bucket: 'l1-raw' },
-  [ServiceName.STORAGE_LAKE]: { bucket: "l4-dl" }
+  [ServiceName.STORAGE_LAKE]: { bucket: "l4-dl" },
+  [ServiceName.STORAGE_DATASET]: { bucket: "l3-rel" },
 };
 
 // Define enum before usage
