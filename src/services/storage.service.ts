@@ -186,4 +186,55 @@ export class StorageService {
     }
   }
 
+  async amendAttributes(
+    bucket: string,
+    objectName: string,
+    newAttributes: { name: string; value: any; color: string }[]
+  ): Promise<any> {
+    try {
+      const sObjectModel = this.getModelForBucket(bucket);
+  
+      // Fetch the existing object
+      const existingObject = await sObjectModel.findOne({ name: objectName });
+  
+      if (!existingObject) {
+        throw new Error(`Object "${objectName}" not found in bucket "${bucket}".`);
+      }
+  
+      // Extract current attributes or initialize an empty array
+      const existingAttributes: { name: string; value: any }[] = existingObject.metadata?.attributes || [];
+  
+      // Create a map of existing attributes for easy lookup
+      const attributeMap = new Map<string, { name: string; value: any }>(
+        existingAttributes.map(attr => [attr.name, attr])
+      );
+  
+      // Merge new attributes (update existing or add new)
+      newAttributes.forEach(attr => {
+        if (attributeMap.has(attr.name)) {
+          // Update value if the attribute exists
+          attributeMap.get(attr.name)!.value = attr.value; // Now TypeScript knows attr.value exists
+        } else {
+          // Add new attribute
+          attributeMap.set(attr.name, attr);
+        }
+      });
+  
+      // Convert back to an array
+      const updatedAttributes = Array.from(attributeMap.values());
+  
+      // Update in database
+      const updatedObject = await sObjectModel.findOneAndUpdate(
+        { name: objectName },
+        { $set: { 'metadata.attributes': updatedAttributes } },
+        { new: true }
+      );
+  
+      return updatedObject;
+    } catch (err) {
+      this.logger.error(`Error updating attributes for object "${objectName}" in bucket "${bucket}".`, err);
+      throw err;
+    }
+  }  
+
 }

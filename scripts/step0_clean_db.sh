@@ -6,7 +6,7 @@ MONGO_PORT="37017"
 DB_NAME="storage"
 
 # MinIO bucket names
-MINIO_BUCKETS=("l1-raw" "l1-preview")
+MINIO_BUCKETS=("l1-raw" "l1-preview" "l3-rel")
 
 # MinIO alias name (configured via mc alias set)
 MINIO_ALIAS="myminio"

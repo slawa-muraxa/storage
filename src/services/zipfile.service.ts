@@ -20,6 +20,73 @@ export class ZipFileProcessorService {
         private readonly kafka: KafkaConnector,
     ) { }
 
+    async extractAnnotationsXml(filePath: string, tmpDir: string): Promise<string> {
+        try {
+            // Ensure the zip file exists
+            if (!fs.existsSync(filePath)) {
+                throw new Error(`Zip file not found: ${filePath}`);
+            }
+    
+            // Create the temporary directory if it doesn't exist
+            if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+            }
+    
+            const extractedFilePath = path.join(tmpDir, 'annotations.xml');
+    
+            this.logger.debug(`Extracting annotations.xml from ${filePath} into ${tmpDir}...`);
+    
+            // Open the zip file and extract only `annotations.xml`
+            const zip = fs.createReadStream(filePath).pipe(unzipper.Parse({ forceStream: true }));
+    
+            for await (const entry of zip) {
+                if (entry.path === 'annotations.xml') {
+                    // Extract to the target directory
+                    await new Promise((resolve, reject) => {
+                        entry.pipe(fs.createWriteStream(extractedFilePath))
+                            .on('finish', resolve)
+                            .on('error', reject);
+                    });
+                    this.logger.debug(`Extracted annotations.xml to ${extractedFilePath}`);
+                    return extractedFilePath; // Return absolute path
+                } else {
+                    entry.autodrain(); // Skip other files
+                }
+            }
+    
+            throw new Error('annotations.xml not found in the zip file');
+        } catch (error) {
+            this.logger.error(`Error extracting annotations.xml from ${filePath}: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    async unzipFileToDirectory(filePath: string, tmpDir: string): Promise<void> {
+        try {
+            // Ensure the zip file exists
+            if (!fs.existsSync(filePath)) {
+                throw new Error(`Zip file not found: ${filePath}`);
+            }
+
+            // Create the temporary directory if it doesn't exist
+            if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+            }
+
+            this.logger.log(`Unzipping ${filePath} into ${tmpDir}...`);
+
+            // Unzip the file
+            await fs.createReadStream(filePath)
+                .pipe(unzipper.Extract({ path: tmpDir }))
+                .promise();
+
+            this.logger.log(`Successfully unzipped ${filePath} into ${tmpDir}`);
+        } catch (error) {
+            this.logger.error(`Error unzipping ${filePath} into ${tmpDir}: ${error.message}`);
+            throw error;
+        }
+    }
+
     private async unzipFile(fileStream: NodeJS.ReadableStream, targetDir: string): Promise<void> {
         // Unzip the file stream and store it in a temporary directory
         await fileStream.pipe(unzipper.Extract({ path: targetDir })).promise();
@@ -38,7 +105,7 @@ export class ZipFileProcessorService {
                 // Store or process the parsed JSON as needed
                 file.content = jsonContent;
 
-            } 
+            }
             await this.storage.uploadFile(this.bucket, file.targetPath, filePath);
             await this.kafka.publishAnnotationUpdate(file);
             this.logger.log(`Uploaded ${filePath} to l4-dl/${file.targetPath}`);

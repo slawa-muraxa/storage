@@ -23,6 +23,8 @@ import { InboundController } from './controllers/inbound.controller';
 import { ImageService } from './services/image.service';
 import { IngestController } from './controllers/ingest.controller';
 import { UploadController } from './controllers/upload.controller';
+import { DatasetService } from './services/dataset.service';
+import { MetadataController } from './controllers/meta.controller';
 
 @Module({
   imports: [
@@ -66,8 +68,9 @@ import { UploadController } from './controllers/upload.controller';
       },
     ]),
   ],
-  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController],
+  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController, MetadataController],
   providers: [
+    DatasetService,
     ZipFileProcessorService,
     KafkaConnector,
     LineageService,
