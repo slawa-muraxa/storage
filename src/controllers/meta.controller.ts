@@ -18,7 +18,7 @@ export class MetadataController {
         private readonly zip: ZipFileProcessorService,
         private readonly dataset: DatasetService
     ) { }
-ta
+
     @Post('sync-dataset')
     @UseGuards(AuthGuard)
     async syncMetadata(@Body() body: { bucketName: string, objectName: string }, @Res() res) {
@@ -27,7 +27,7 @@ ta
         const tempFilePath = path.join(tempDir, objectName);
 
         if (!fs.existsSync(tempDir)) {
-            fs.mkdirSync(tempDir);
+            fs.mkdirSync(tempDir, { recursive: true });
         }
 
         try {
