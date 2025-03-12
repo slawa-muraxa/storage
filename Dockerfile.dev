@@ -1,0 +1,21 @@
+# Use a lightweight Node.js base image
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install ffmpeg for media processing (if required)
+RUN apk add --no-cache ffmpeg
+
+# Install dependencies separately to leverage Docker cache
+COPY package*.json ./
+RUN npm install
+
+# Copy source code
+COPY . .
+
+# Expose port for debugging
+EXPOSE 3004
+
+# Start the application in dev mode
+CMD ["npm", "run", "start"]

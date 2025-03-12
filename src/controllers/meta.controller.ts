@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, UseGuards,HttpStatus, Logger, Inject } from '@nestjs/common';
+import { Controller, Post, Body, Res, UseGuards, HttpStatus, Logger, Inject } from '@nestjs/common';
 import { StorageConnector } from '../connectors/storage.connector';
 import { StorageService } from '../services/storage.service';  // Mongo service to interact with your database
 import { AuthGuard } from '../auth/auth.guard.rpc';  // Auth guard for route protection
@@ -31,18 +31,21 @@ export class MetadataController {
         }
 
         try {
-            const filePath = await this.storage.downloadFile(bucketName, objectName, tempFilePath);
-            const annotationFile = await this.zip.extractAnnotationsXml(filePath, tempDir);
+            this.logger.debug("extractAnnotationsXml");
+            const stream = await this.storage.downloadFileStream(bucketName, objectName);
+            const annotationFile = await this.zip.extractAnnotationsXml(stream, tempDir);
             const attributes: any[] = this.dataset.readMetadata(annotationFile);
             const datasetObjects: any[] = this.dataset.readObjects(annotationFile);
 
             await this.db.tagObject(bucketName, objectName, datasetObjects);
             await this.db.amendAttributes(bucketName, objectName, attributes);
 
+            stream.destroy();
+
             const object = await this.db.getObject(bucketName, objectName);
 
-            fs.unlinkSync(filePath);
-            fs.unlinkSync(annotationFile);
+            //fs.unlinkSync(filePath);
+            //fs.unlinkSync(annotationFile);
             return res.status(200).json(object);
         } catch (error) {
             return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: error.message });

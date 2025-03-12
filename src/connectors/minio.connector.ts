@@ -13,6 +13,9 @@ export class MinioConnector implements StorageConnector {
     constructor(
         @Inject('S3_CLIENT') private readonly minioClient: MinioClient,
     ) { }
+    downloadFileStream(bucketName: string, objectName: string): Promise<Readable> {
+        throw new Error('Method not implemented.');
+    }
 
     async downloadFile(bucketName: string, objectName: string, filePath: string): Promise<string> {
         try {

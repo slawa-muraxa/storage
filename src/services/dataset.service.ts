@@ -33,15 +33,15 @@ export class DatasetService {
 
         if (tracks) {
             tracks.forEach(track => {
-                if (track.box) {
-                    const boxes = Array.isArray(track.box) ? track.box : [track.box];
-                    boxes.forEach(box => {
+                const objects = this.getCombinedObjects(track);
+                if (objects) {
+                    objects.forEach(object => {
                         total_annotations += 1;
-                        exportFramesSet.add(parseInt(box.frame, 10));
+                        exportFramesSet.add(parseInt(object.frame, 10));
 
-                        if (box.keyframe === "1") {
+                        if (object.keyframe === "1") {
                             key_annotations += 1;
-                            annotatedFramesSet.add(parseInt(box.frame, 10));
+                            annotatedFramesSet.add(parseInt(object.frame, 10));
                         }
                     });
                 }
@@ -63,7 +63,7 @@ export class DatasetService {
         const labelsMap = new Map<string, { name: string; value: number; color: string }>();
 
         // Extract labels and colors
-        const labels = result.annotations.meta.task.labels.label;
+        const labels = result.annotations.meta.task ? result.annotations.meta.task.labels.label : result.annotations.meta.job.labels.label;
         const labelArray = Array.isArray(labels) ? labels : [labels];
 
         labelArray.forEach(label => {
@@ -75,12 +75,30 @@ export class DatasetService {
 
         tracks.forEach(track => {
             if (labelsMap.has(track.label)) {
-                const boxes = Array.isArray(track.box) ? track.box : [track.box];
-                labelsMap.get(track.label)!.value += boxes.length;
+                const objects = this.getCombinedObjects(track);
+                labelsMap.get(track.label)!.value += objects.length;
             }
         });
 
         return Array.from(labelsMap.values());
+    }
+
+    getCombinedObjects(element: any): any[] {
+        const combinedObjects = [];
+
+        // Add boxes to the combined array
+        if (element.box) {
+            const boxes = Array.isArray(element.box) ? element.box : [element.box];
+            combinedObjects.push(...boxes);  // Flatten and push all boxes
+        }
+
+        // Add points to the combined array
+        if (element.points) {
+            const points = Array.isArray(element.points) ? element.points : [element.points];
+            combinedObjects.push(...points);  // Flatten and push all points
+        }
+
+        return combinedObjects;
     }
 
 }

@@ -2,6 +2,7 @@ import { Readable } from "stream";
 
 export interface StorageConnector {
     downloadFile(bucketName: string, objectName: string, filePath: string): Promise<string>;
+    downloadFileStream(bucketName: string, objectName: string): Promise<Readable>
     getObject(bucketName: string, objectName: string): Promise<Readable>;
     putObject(bucketName: string, targetFilePath: string, fullPath: string, metadata?: Record<string, any>): Promise<any>;
     putTextObject(key: string, body: string, bucket: string ): Promise<any>;

@@ -5,6 +5,10 @@ import * as unzipper from 'unzipper';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Readable } from 'stream';
+
+import { pipeline } from 'stream';
+import { promisify } from 'util';
 
 @Injectable()
 export class ZipFileProcessorService {
@@ -20,45 +24,48 @@ export class ZipFileProcessorService {
         private readonly kafka: KafkaConnector,
     ) { }
 
-    async extractAnnotationsXml(filePath: string, tmpDir: string): Promise<string> {
+    async extractAnnotationsXml(fileStream: Readable, tmpDir: string): Promise<string> {
         try {
-            // Ensure the zip file exists
-            if (!fs.existsSync(filePath)) {
-                throw new Error(`Zip file not found: ${filePath}`);
-            }
-    
-            // Create the temporary directory if it doesn't exist
             if (!fs.existsSync(tmpDir)) {
                 fs.mkdirSync(tmpDir, { recursive: true });
             }
     
             const extractedFilePath = path.join(tmpDir, 'annotations.xml');
+            this.logger.debug(`Extracting annotations.xml from stream into ${tmpDir}...`);
     
-            this.logger.debug(`Extracting annotations.xml from ${filePath} into ${tmpDir}...`);
+            // Open the zip file from the stream
+            const zip = await unzipper.Open.buffer(await this.streamToBuffer(fileStream));
     
-            // Open the zip file and extract only `annotations.xml`
-            const zip = fs.createReadStream(filePath).pipe(unzipper.Parse({ forceStream: true }));
-    
-            for await (const entry of zip) {
-                if (entry.path === 'annotations.xml') {
-                    // Extract to the target directory
-                    await new Promise((resolve, reject) => {
-                        entry.pipe(fs.createWriteStream(extractedFilePath))
-                            .on('finish', resolve)
-                            .on('error', reject);
-                    });
-                    this.logger.debug(`Extracted annotations.xml to ${extractedFilePath}`);
-                    return extractedFilePath; // Return absolute path
-                } else {
-                    entry.autodrain(); // Skip other files
-                }
+            const fileEntry = zip.files.find(file => file.path === 'annotations.xml');
+            if (!fileEntry) {
+                throw new Error('annotations.xml not found in the zip stream');
             }
     
-            throw new Error('annotations.xml not found in the zip file');
+            await new Promise((resolve, reject) => {
+                fileEntry
+                    .stream()
+                    .pipe(fs.createWriteStream(extractedFilePath))
+                    .on('finish', resolve)
+                    .on('error', reject);
+            });
+    
+            this.logger.debug(`Extracted annotations.xml to ${extractedFilePath}`);
+            return extractedFilePath;
+    
         } catch (error) {
-            this.logger.error(`Error extracting annotations.xml from ${filePath}: ${error.message}`);
+            this.logger.error(`Error extracting annotations.xml from stream: ${error.message}`);
             throw error;
         }
+    }
+    
+    // Helper function to convert the stream into a buffer
+    async streamToBuffer(stream: Readable): Promise<Buffer> {
+        return new Promise((resolve, reject) => {
+            const chunks: Buffer[] = [];
+            stream.on('data', chunk => chunks.push(chunk));
+            stream.on('end', () => resolve(Buffer.concat(chunks)));
+            stream.on('error', reject);
+        });
     }
     
     async unzipFileToDirectory(filePath: string, tmpDir: string): Promise<void> {

@@ -192,6 +192,21 @@ export class S3Connector implements StorageConnector {
         }
     }
 
+    async downloadFileStream(bucketName: string, objectName: string): Promise<Readable> {
+        try {
+            const command = new GetObjectCommand({ Bucket: bucketName, Key: objectName });
+            const response = await this.s3Client.send(command);
+    
+            const fileStream = response.Body as Readable;
+    
+            this.logger.log(`Successfully retrieved stream for ${objectName} from S3 bucket ${bucketName}`);
+            return fileStream;
+        } catch (err) {
+            this.logger.error(`Error retrieving stream for ${objectName} from S3 bucket ${bucketName}:`, err);
+            throw err;
+        }
+    }
+
     async uploadFile(bucketName: string, objectName: string, filePath: string, metadata: Record<string, any> = {}): Promise<string> {
         try {
             // Create a read stream for the file
