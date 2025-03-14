@@ -25,6 +25,8 @@ import { IngestController } from './controllers/ingest.controller';
 import { UploadController } from './controllers/upload.controller';
 import { DatasetService } from './services/dataset.service';
 import { MetadataController } from './controllers/meta.controller';
+import { SearchController } from './controllers/search.controller';
+import { SearchService } from './services/search.service';
 
 @Module({
   imports: [
@@ -68,7 +70,7 @@ import { MetadataController } from './controllers/meta.controller';
       },
     ]),
   ],
-  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController, MetadataController],
+  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController, MetadataController, SearchController],
   providers: [
     DatasetService,
     ZipFileProcessorService,
@@ -80,6 +82,7 @@ import { MetadataController } from './controllers/meta.controller';
     IngestService,
     TagService,
     AuthGuard,
+    SearchService,
     {
       provide: 'S3_CLIENT',
       useFactory: s3ClientFactory,
