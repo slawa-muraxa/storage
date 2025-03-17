@@ -22,7 +22,7 @@ RUN npx nest build
 # Stage 2: Production image with minimal size
 FROM node:20-alpine AS production
 
-# Install ffmpeg for runtime media processing (if needed)
+# Install ffmpeg for runtime media processing
 RUN apk update && apk add --no-cache ffmpeg
 
 ENV DOCKERIZE_VERSION=v0.8.0
