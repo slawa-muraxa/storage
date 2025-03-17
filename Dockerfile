@@ -7,14 +7,17 @@ WORKDIR /app
 # Copy package.json and package-lock.json (or yarn.lock)
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production
+# Install ALL dependencies, including devDependencies (required for NestJS CLI)
+RUN npm ci
 
 # Copy the rest of the application code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Ensure NestJS CLI is installed locally
+RUN npx nest --version
+
+# Build the application using npx to avoid global dependency issues
+RUN npx nest build
 
 # Stage 2: Production image with minimal size
 FROM node:20-alpine AS production
