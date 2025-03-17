@@ -27,6 +27,7 @@ import { DatasetService } from './services/dataset.service';
 import { MetadataController } from './controllers/meta.controller';
 import { SearchController } from './controllers/search.controller';
 import { SearchService } from './services/search.service';
+import { LineageController } from './controllers/lineage.controller';
 
 @Module({
   imports: [
@@ -70,7 +71,7 @@ import { SearchService } from './services/search.service';
       },
     ]),
   ],
-  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController, MetadataController, SearchController],
+  controllers: [StorageController, MetaController, TagController, InboundController, IngestController, UploadController, MetadataController, SearchController, LineageController],
   providers: [
     DatasetService,
     ZipFileProcessorService,
